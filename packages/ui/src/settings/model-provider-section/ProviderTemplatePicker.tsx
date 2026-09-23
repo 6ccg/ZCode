@@ -11,6 +11,10 @@ import {
 import { Button } from "@/components/ui/button.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
+import {
+  ZHIPU_OFFICIAL_PLANS_ENABLED,
+  isZhipuOfficialPlanDisabled,
+} from "@/lib/officialPlanAvailability.js";
 import { logger } from "@/logger.js";
 import { ProviderLogo } from "./ProviderLogo.js";
 import { useProviderDetailFeedback } from "./ProviderDetailFeedback.js";
@@ -86,6 +90,11 @@ export function ProviderTemplatePicker({
         </h2>
       </div>
 
+      {!ZHIPU_OFFICIAL_PLANS_ENABLED ? (
+        <p className="text-ui-sm text-foreground-subtle">
+          {intl.formatMessage({ id: "settings.modelProvider.officialPlansDisabled" })}
+        </p>
+      ) : null}
       <div className="space-y-6">
         {groups.map((group) => (
           <section key={group.id} data-provider-template-group={group.id} className="space-y-3">
@@ -112,7 +121,7 @@ export function ProviderTemplatePicker({
                   <ProviderTemplateCard
                     key={template.templateId}
                     label={label}
-                    disabled={creating}
+                    disabled={creating || isZhipuOfficialPlanDisabled(template.config.access?.type)}
                     testId={testId(TID_MODEL_PROVIDER_TEMPLATE_ITEM, template.templateId)}
                     icon={
                       <span className="flex size-9 shrink-0 items-center justify-center">
