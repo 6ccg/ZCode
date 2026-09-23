@@ -18,6 +18,7 @@ import {
   type AppSettings,
   type DesktopCommandId,
   type Locale,
+  ZCODE_APP_UPDATES_ENABLED,
 } from "@zcode/shared";
 import type { MessageBoxOptions } from "electron";
 import { app, BrowserWindow, dialog, session, shell } from "electron";
@@ -593,11 +594,11 @@ export async function executeDesktopCommand(options: {
       );
       return;
     case DesktopCommandIds.CheckForUpdates:
-      // 按产品身份而不是后端环境放行：生产后端的 Preview 同样没有更新器。
-      if (ZCODE_PRODUCT_FLAVOR === "production") {
+      // 隐藏 UI 后仍需拦住旧命令，避免修改版检查并安装官方包。
+      if (ZCODE_APP_UPDATES_ENABLED && ZCODE_PRODUCT_FLAVOR === "production") {
         checkForUpdateMenuClick(targetWindow);
       } else {
-        options.logger.info("[auto-update] Preview 已禁用手动更新检查");
+        options.logger.info("[auto-update] 产品策略已禁用手动更新检查");
       }
       return;
     case DesktopCommandIds.RelaunchApp:
