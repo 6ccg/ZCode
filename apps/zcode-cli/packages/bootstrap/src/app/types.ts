@@ -1,3 +1,4 @@
+import type { BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 import type { AiSdkModelAdapter } from "@zcode/adapters/model";
 import type {
   AgentTelemetryRuntimeOwner,
@@ -139,6 +140,7 @@ export interface ZCodeAppOptions {
   modelSelectionMode?: "cli-default";
   /** Host 在运行实例创建时传入，运行中不刷新。 */
   additionalDirectories?: readonly string[];
+  builtinPromptSource?: BuiltinPromptSource;
   sessionId?: SessionId;
   resume?: boolean;
   version?: string;

@@ -1,5 +1,6 @@
 import { PermissionService, ToolScheduler } from "./deps.js";
 import type { ModelRequestSessionFeature } from "@zcode/contracts";
+import type { BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 import type {
   Logger,
   ModelSelection,
@@ -117,6 +118,7 @@ export interface AgentRuntimeInternal
   memoryDreamLastScanAtMs: number;
   pendingMemoryUpdate?: ProjectMemoryUpdate;
   contextSourcePort?: ContextSourcePort;
+  builtinPromptSource?: BuiltinPromptSource;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
   mcpStartupPromise?: Promise<McpConnectionSnapshot>;

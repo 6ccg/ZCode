@@ -142,6 +142,9 @@ async function executeProjectMemoryExtraction(
       const prompt = buildMemoryExtractionPrompt({
         manifest,
         messageCount: input.messageCount,
+        builtinPromptOverrides:
+          (await runtime.builtinPromptSource?.readOverrides()) ??
+          runtime.config.builtinPromptOverrides,
       });
       await runMemoryAgentLoop({
         abortSignal: input.abortSignal,

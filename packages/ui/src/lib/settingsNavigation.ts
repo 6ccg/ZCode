@@ -11,6 +11,7 @@ export type SettingsSectionId =
   | "dataSync"
   | "personalization"
   | "memory"
+  | "builtinPrompts"
   | "plugin"
   | "mcp"
   | "skill"
@@ -77,6 +78,7 @@ function isSettingsSectionId(value: string): value is SettingsSectionId {
     value === "dataSync" ||
     value === "personalization" ||
     value === "memory" ||
+    value === "builtinPrompts" ||
     value === "plugin" ||
     value === "mcp" ||
     value === "skill" ||
