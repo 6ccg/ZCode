@@ -7,6 +7,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./builtin-prompts": "./src/builtin-prompts/index.ts",
     "./runtime-env": "./src/runtimeEnv.ts",
     "./test-ids": "./src/test-ids.ts",
     "./mcp": "./src/mcp.ts",

@@ -66,6 +66,8 @@ it("BOT-E2E-RW-02 legacy 与 stable Bot 通过同一 Source 身份完成任务�
     updateDataBaseDir: async () => {},
     getUserInstructions: async () => ({ content: "", filePath: "" }),
     saveUserInstructions: async () => ({ filePath: "" }),
+    getBuiltinPrompts: async () => ({}),
+    setBuiltinPrompt: async () => ({}),
   };
   const credentials = {
     load: async () => null,

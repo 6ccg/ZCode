@@ -76,9 +76,11 @@ export function scheduleProjectMemoryExtraction(
     },
   );
 
-  runtime.memoryExtractionScheduler ??= createMemoryExtractionScheduler((extraction) =>
-    executeProjectMemoryExtraction(runtime, extraction),
-    () => { for (const notify of runtime.workChanged) notify(); },
+  runtime.memoryExtractionScheduler ??= createMemoryExtractionScheduler(
+    (extraction) => executeProjectMemoryExtraction(runtime, extraction),
+    () => {
+      for (const notify of runtime.workChanged) notify();
+    },
   );
   runtime.memoryExtractionScheduler.schedule(snapshot);
 }
@@ -144,6 +146,9 @@ async function executeProjectMemoryExtraction(
       const prompt = buildMemoryExtractionPrompt({
         manifest,
         messageCount: input.messageCount,
+        builtinPromptOverrides:
+          (await runtime.builtinPromptSource?.readOverrides()) ??
+          runtime.config.builtinPromptOverrides,
       });
       await runMemoryAgentLoop({
         abortSignal: input.abortSignal,
