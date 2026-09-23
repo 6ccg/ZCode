@@ -336,21 +336,37 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       if (current.revision !== expectedRevision)
         throw new Error("Model catalog revision conflict，请重新获取目录");
       const previous = current.modelCatalogs?.[providerId];
-      if (!previous || !current.providers.has(providerId)) throw new Error("ModelLink 渠道不存在");
-      const personalIds = new Set(current.providers.get(providerId)?.personalModelIds ?? []);
+      const provider = current.providers.get(providerId);
+      if (!previous || !provider) throw new Error("ModelLink 渠道不存在");
+      const personalIds = new Set(provider.personalModelIds ?? []);
       const imported = models.filter((model) => !personalIds.has(model.modelId));
       const ids = new Set(imported.map((model) => model.modelId));
       const catalog = modelCatalogSchema.parse({
         source: "modellink",
         fetchedAt: new Date().toISOString(),
-        models: [
-          ...imported,
-          ...previous.models
-            .filter((model) => !ids.has(model.modelId) && !personalIds.has(model.modelId))
-            .map((model) => ({ ...model, available: false })),
-        ],
+        models: imported,
       });
-      return { ...current, modelCatalogs: { ...current.modelCatalogs, [providerId]: catalog } };
+      // 旧实现把下架条目标为不可用后继续追加，导致刷新后设置列表仍残留模型。
+      // 成功目录是导入成员的唯一来源；下架项的精确规则和排序也在同次提交中删除。
+      const removedIds = new Set(
+        previous.models
+          .filter((model) => !ids.has(model.modelId) && !personalIds.has(model.modelId))
+          .map((model) => model.modelId),
+      );
+      let rules = current.models;
+      for (const modelId of removedIds) rules = rules.deleteExact(providerId, modelId);
+      return {
+        ...current,
+        providers:
+          removedIds.size > 0 && provider.modelOrder
+            ? current.providers.set(
+                providerId,
+                provider.withModelOrder(provider.modelOrder.filter((id) => !removedIds.has(id))),
+              )
+            : current.providers,
+        models: rules,
+        modelCatalogs: { ...current.modelCatalogs, [providerId]: catalog },
+      };
     });
   }
 

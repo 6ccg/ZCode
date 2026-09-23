@@ -136,6 +136,105 @@ test("missing catalog limits inherit defaults and old null snapshots are normali
   }
 });
 
+test("catalog refresh deletes upstream removals and preserves manual models and retained overrides", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "zcode-modellink-removal-"));
+  const file = join(dir, "provider_config.json");
+  const options = {
+    zcodeBuiltinFilePath: bundled,
+    personalFilePath: file,
+    personalPollingIntervalMs: false as const,
+  };
+  let runtime = new NodeProviderConfigRuntime(options);
+  try {
+    const { providerId } = await runtime.configService.createPersonalProvider({
+      catalogSource: "modellink",
+      initialConfig: parseProviderConfig({
+        api: { type: "openai-chat-completions", baseUrl: "http://127.0.0.1:32123/v1" },
+        access: { type: "api-key", apiKey: "test-only" },
+      }),
+    });
+    const refresh = async (data: unknown, status = 200) => {
+      const before = await runtime.personalRepository.read();
+      const models = await loadModelLinkCatalog(before.providers.get(providerId)!, async () =>
+        Response.json(data, { status }),
+      );
+      await runtime.configService.saveModelCatalog(providerId, models, before.revision);
+    };
+    const catalog = (...ids: string[]) => ({
+      data: ids.map((id) => model(id, "chat_completions")),
+    });
+    const assertModelIds = async (expected: string[]) => {
+      const snapshot = await runtime.configService.read();
+      const resolved = new ProviderConfigResolver().resolve({
+        ...snapshot,
+        accountProviders: ProviderConfigMap.empty(),
+      });
+      assert.deepEqual(
+        resolved.resolvedProviders
+          .find((provider) => provider.providerId === providerId)!
+          .models.map((item) => item.modelId),
+        expected,
+      );
+      assert.deepEqual(
+        resolved.registryProviders
+          .find((provider) => provider.providerId === providerId)!
+          .models.map((item) => item.modelId),
+        expected,
+      );
+    };
+    await refresh(catalog("nex-2.5-pro", "remaining-model", "manual-model"));
+    await runtime.configService.detachCatalogModel(providerId, "manual-model");
+    for (const id of ["nex-2.5-pro", "remaining-model"]) {
+      await runtime.configService.savePersonalModelDraft(
+        providerId,
+        id,
+        id,
+        parseModelConfig({ properties: { contextWindow: 8192 } }),
+        (await runtime.personalRepository.read()).revision,
+        true,
+      );
+    }
+    await runtime.configService.reorderPersonalModels(providerId, [
+      "nex-2.5-pro",
+      "remaining-model",
+      "manual-model",
+    ]);
+    const beforeFailure = await readFile(file, "utf8");
+    await assert.rejects(refresh(catalog(), 503), /503/);
+    await assert.rejects(refresh({ data: [{ id: "remaining-model" }] }), /协议|protocol/);
+    assert.equal(await readFile(file, "utf8"), beforeFailure);
+
+    await refresh(catalog("remaining-model"));
+    await assertModelIds(["remaining-model", "manual-model"]);
+    const saved = await runtime.personalRepository.read();
+    assert.deepEqual(
+      saved.modelCatalogs?.[providerId]?.models.map((item) => item.modelId),
+      ["remaining-model"],
+    );
+    assert.equal(saved.models.getExact(providerId, "nex-2.5-pro"), undefined);
+    assert.equal(
+      saved.models.getExact(providerId, "remaining-model")?.properties.contextWindow,
+      8192,
+    );
+    assert.deepEqual(saved.providers.get(providerId)?.modelOrder, [
+      "remaining-model",
+      "manual-model",
+    ]);
+    runtime.dispose();
+    runtime = new NodeProviderConfigRuntime(options);
+    await assertModelIds(["remaining-model", "manual-model"]);
+    await refresh(catalog());
+    await assertModelIds(["manual-model"]);
+    assert.deepEqual(
+      (await runtime.personalRepository.read()).modelCatalogs?.[providerId]?.models,
+      [],
+    );
+  } finally {
+    runtime.dispose();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("catalog snapshot survives restart, preserves manual overrides and rejects stale writes", async () => {
   const dir = await mkdtemp(join(tmpdir(), "zcode-modellink-"));
   const file = join(dir, "provider_config.json");
@@ -253,6 +352,11 @@ test("catalog snapshot survives restart, preserves manual overrides and rejects 
       }).registryProviders.length,
       0,
     );
+    await runtime.configService.saveModelCatalog(
+      id,
+      models,
+      (await runtime.personalRepository.read()).revision,
+    );
     await runtime.configService.detachCatalogModel(id, "chat-model");
     await runtime.configService.saveModelCatalog(
       id,
@@ -265,7 +369,7 @@ test("catalog snapshot survives restart, preserves manual overrides and rejects 
         ...(await runtime.configService.read()),
         accountProviders: ProviderConfigMap.empty(),
       }).registryProviders[0]!.models[0]!.config.properties.contextWindow,
-      8192,
+      32000,
     );
   } finally {
     runtime.dispose();

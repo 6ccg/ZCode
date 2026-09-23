@@ -15,8 +15,8 @@
 1. 保存地址/Key 后由用户点击“获取模型”或刷新；Host 请求该渠道的 `/v1/models?include=modellink`，保留用户已有查询参数。缺少地址/Key 时不请求，不新增后台轮询服务。
 2. ModelLink 响应须包含显式 `modellink` 扩展及客户端协议/能力信息。按首选协议导入对应渠道；旧服务没有扩展时明确失败，不按名称猜协议。此接口合同由 ModelLink 后端提供，其部署不属于本仓库构建。
 3. 目录写入 `modelCatalogs` 快照，按 providerId 隔离，只保留归一化条目、来源与获取时间，不保存原始响应。目录条目的 ID 就是导入成员集合，不重复维护 importedModelIds。
-4. 推荐顺序为随包通用规则 → ModelLink 默认值与目录 → 当前个人规则。刷新不覆盖用户手动规则；手动模式继续沿用现有整套参数覆盖语义。
-5. 成功目录中下架的模型保留身份并标记不可选；历史会话不改指向，不自动换模型。目录失败保留已有快照。用户可显式转为手动管理。
+4. 推荐顺序为随包通用规则 → ModelLink 默认值与目录 → 当前个人规则。刷新不覆盖仍在目录中的模型及手动管理模型的个人规则；手动模式继续沿用现有整套参数覆盖语义。
+5. 成功获取目录后，以最新目录替换该渠道的导入成员；上游已移除的模型从目录、设置列表及可选列表直接删除，同时清理其个人精确规则和排序项。成功返回空目录时删除全部导入成员。用户新增或已显式转为手动管理的模型不受影响；仍在目录中的模型保留个人覆盖。历史会话不改指向，不自动换模型。目录请求或解析失败保留已有快照。
 6. 地址、Key 或渠道类型发生变化时，在同次提交中使旧目录失效；普通保存不清空目录。网络请求不持有写锁，提交前检查渠道与 revision，过期响应不覆盖新配置。
 
 | 能力             | 规则                                                                                                                    |
@@ -62,12 +62,13 @@ flowchart LR
 ```
 
 - UI 只拥有草稿，模型目录由 ModelLink 提供；用户覆盖、导入快照和辅助选择由 ProviderConfigService/个人 Repository 唯一写入。
+- 手动获取沿用原有 Host 命令：请求成功并归一化 → 校验渠道和 revision → 在同一次 Repository 提交中替换目录并清理下架成员 → 重新投影设置与 Registry。过期响应不得删除新配置；重复提交相同目录不会重新添加下架模型。旧快照保留的不可用条目在下一次成功获取时一并移除，不新增迁移文件或后台任务。
 - 已开始的请求继续使用创建时冻结的选择；刷新或设置变化只作用于后续绑定。CLI 通过现有 ModelCatalogPort 读取，不新增 session/create 字段。
 - 保留 workspace identity、owner/lease、远端目标 Host 校验；桌面 continuous 和手机 replayable 使用原有交付边界。
 
 ## 验证
 
-- `packages/provider-node/test/modellinkCatalog.test.ts`：分协议导入、URL 查询、手动覆盖、目录失效、重启恢复及过期提交；缺失能力值继承默认且模型可选，旧目录空值规范化后重启仍可用。
+- `packages/provider-node/test/modellinkCatalog.test.ts`：分协议导入、URL 查询、手动覆盖、目录失效、重启恢复及过期提交；缺失能力值继承默认且模型可选，旧目录空值规范化后重启仍可用。Nex 2.5 Pro 下架场景验证刷新后设置成员、Registry、持久化目录、精确规则及排序项均移除，手动模型与仍在目录中的覆盖保留；失败不清空，空目录清理全部导入成员。
 - `packages/services/test/providerConfigMigration.test.ts` 与 `providerConfigVersionCoexistence.test.ts`：配置迁移、原版文件不改写及修改版快照不被后续原版保存覆盖。
 - `apps/zcode-cli/packages/adapters/test/modellink-auxiliary-runtime.test.ts`：实际 AgentRuntime/AI SDK 对本地 HTTP 夹具发出 Responses 主请求与指定 Chat/high 辅助请求，并验证工具续轮、图像和流式结束。
 - 隔离界面已验证两种渠道创建、获取模型、辅助模型/档位重载保留；构建默认地址验证了未设置留空、设置后预填、已有地址不覆盖、用户修改后保留。
