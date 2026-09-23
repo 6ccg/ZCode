@@ -2,6 +2,7 @@ import { mkdtemp, readFile, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PERSONAL_PROVIDER_CONFIG_FILE_NAME } from "@zcode/provider-node";
 
 describe("model provider restart runtime", () => {
   afterEach(() => {
@@ -130,13 +131,17 @@ describe("model provider restart runtime", () => {
     await seedTurboAgentStartupModel("provider-a", "model-a");
 
     expect(
-      JSON.parse(await readFile(join(homeDir, ".zcode", "v2", "provider_config.json"), "utf-8")),
+      // 冷启动播种与应用共用修改版配置，不再断言原版 v1 文件。
+      JSON.parse(
+        await readFile(join(homeDir, ".zcode", "v2", PERSONAL_PROVIDER_CONFIG_FILE_NAME), "utf-8"),
+      ),
     ).toEqual({
-      schemaVersion: 1,
+      schemaVersion: 2,
       config: {
         providerOrder: [],
         providerConfigRules: { providerRules: [] },
         modelConfigRules: { providerModelRules: [], manualProviderModelRules: [] },
+        modelCatalogs: {},
         defaultModelSelection: { providerId: "provider-a", modelId: "model-a" },
       },
     });

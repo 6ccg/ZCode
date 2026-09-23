@@ -12,6 +12,26 @@ import { maybeStartSessionTitleGeneration } from "../src/runtime/methods/session
 import { retainTitleModelContext } from "../src/runtime/methods/title-generation-sidecar.js";
 
 describe("闲时默认标题请求", () => {
+  it("标题排队时冻结辅助模型与推理档位，不影响主会话选择", () => {
+    const auxiliary = createTestModelSelection("auxiliary/title", { reasoningLevel: "high" });
+    const runtime = createTestAgentRuntime(
+      createSessionId("title-auxiliary-snapshot"),
+      { modelSelection: createTestModelSelection("user/normal"), workingDirectory: "/workspace" },
+      {
+        eventStore: createTestSessionEventStore(),
+        modelCatalogPort: { listModels: () => [], getAuxiliaryModelSelection: () => auxiliary },
+      },
+    );
+    const context = retainTitleModelContext(runtime as unknown as AgentRuntimeInternal);
+    auxiliary.modelId = "changed-after-queue";
+    auxiliary.options!.reasoningLevel = "low";
+    expect(context.selection?.modelId).toBe("title");
+    expect(context.auxiliaryReasoningLevel).toBe("high");
+    expect(context.selection?.options?.reasoningLevel).toBe("high");
+    expect(runtime.getSessionModelSelection()?.providerId).toBe("user");
+    context.release();
+  });
+
   it("标题读库尚未结束时主轮不能收口，早退也释放租约；独立调用与接管不借用闲时票", async () => {
     const events: OffPeakLifecycleEvent[] = [];
     const gate = Promise.withResolvers<null>();
