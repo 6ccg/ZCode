@@ -384,3 +384,4 @@ async function isFile(path: string): Promise<boolean> {
     return false;
   }
 }
+export { createNodeBuiltinPromptSource } from "./builtin-prompts.js";

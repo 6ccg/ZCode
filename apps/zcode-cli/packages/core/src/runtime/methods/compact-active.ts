@@ -285,6 +285,9 @@ async function compactActiveConversationImpl(
   // tools 段与主循环不同，整个摘要请求不命中主循环的前缀缓存。
   const compactCandidates = options.getContinuationTools?.() ?? this.getTools(compactModel);
   const registry = this.getToolRegistry();
+  const promptOverrides =
+    (await this.builtinPromptSource?.readOverrides()) ?? this.config.builtinPromptOverrides;
+  const compactPrompt = buildCompactPrompt(customInstructions, promptOverrides);
 
   while (true) {
     try {
@@ -295,7 +298,6 @@ async function compactActiveConversationImpl(
           querySource: "compact",
         },
       });
-      const compactPrompt = buildCompactPrompt(customInstructions);
       let result: RuntimeModelTextResult;
       let compactPromptTooLongAttempts = 0;
       let stripMediaForSummary = false;

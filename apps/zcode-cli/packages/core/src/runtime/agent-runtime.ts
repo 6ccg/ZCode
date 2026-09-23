@@ -7,6 +7,7 @@ import {
 import { DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY, resolveExecutionState } from "@zcode/shared";
 import type { BackgroundBashOutputResult } from "@zcode/shared";
 import type { ModelRequestSessionFeature } from "@zcode/contracts";
+import type { BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 import {
   createDenyPermissionBroker,
   createRootTraceContext,
@@ -212,6 +213,7 @@ export class AgentRuntime {
   private memoryDreamLastScanAtMs = 0;
   private pendingMemoryUpdate?: ProjectMemoryUpdate;
   private contextSourcePort?: ContextSourcePort;
+  private builtinPromptSource?: BuiltinPromptSource;
   private skillPort?: SkillPort;
   private mcpPort?: McpPort;
   private mcpStartupPromise?: Promise<McpConnectionSnapshot>;
@@ -298,6 +300,7 @@ export class AgentRuntime {
     // 3.12.2：兼容旧 Host/内部调用传入 legacy，但本版本 Runtime、日志和子 Agent 只使用 preflight。
     this.config = {
       ...config,
+      builtinPromptOverrides: { ...config.builtinPromptOverrides },
       modelContextBudgetStrategy: DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
     };
     Object.assign(this.config, resolveExecutionState(config));
@@ -362,6 +365,7 @@ export class AgentRuntime {
     this.runtimeCommandQueue = createRuntimeCommandQueue();
     this.workingDirectory = config.workingDirectory ?? ".";
     this.contextSourcePort = deps.contextSourcePort;
+    this.builtinPromptSource = deps.builtinPromptSource;
     this.skillPort = deps.skillPort;
     this.mcpPort = deps.mcpPort;
     this.runtimeTaskRegistry = deps.runtimeTaskRegistry ?? new InMemoryRuntimeTaskRegistry();
@@ -635,9 +639,9 @@ export interface AgentRuntime {
     traceContext?: TraceContext;
   }): Promise<boolean>;
   /** v4 queue 单项编辑：按 pendingInputId 原地替换排队输入（保位），并释放编辑锁。 */
-  editPendingInputById(options: EditPendingInputOptions & { traceContext?: TraceContext }): Promise<
-    EditPendingInputResult
-  >;
+  editPendingInputById(
+    options: EditPendingInputOptions & { traceContext?: TraceContext },
+  ): Promise<EditPendingInputResult>;
   /** composer 编辑态冻结：只对未 reserve 且无他人锁的排队项生效。 */
   lockPendingInputEdit(options: {
     pendingInputId: string;
