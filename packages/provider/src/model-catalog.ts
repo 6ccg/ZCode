@@ -12,7 +12,14 @@ export const modelCatalogEntrySchema = z
     modelId: z.string().trim().min(1),
     available: z.boolean(),
     defaultReasoningLevel: z.string().min(1).optional(),
-    config: modelConfigDataSchema,
+    config: modelConfigDataSchema.transform((config) => {
+      // 目录空值表示未提供能力，不能覆盖 ZCode 默认值并使模型被 Registry 排除。
+      // 同一解析边界也规范化旧快照，文件仓库会将清理结果一次性写回。
+      if (config.properties?.contextWindow === null) delete config.properties.contextWindow;
+      if (config.optionSpecs?.maxOutputTokens?.max === null)
+        delete config.optionSpecs.maxOutputTokens.max;
+      return config;
+    }),
   })
   .strict();
 export const modelCatalogSchema = z
@@ -85,8 +92,8 @@ const remoteModelSchema = z.object({
     protocols: z.record(z.string(), z.record(z.string(), z.unknown())),
   }),
 });
-const positive = (value: unknown): number | null =>
-  typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : null;
+const positive = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : undefined;
 
 /** 只消费访问 Key 可见的公开目录，不靠显示名称或 Muse 前缀猜协议。 */
 export function normalizeModelLinkCatalog(input: unknown, apiType: string): ModelCatalogEntry[] {

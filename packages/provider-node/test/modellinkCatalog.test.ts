@@ -62,6 +62,80 @@ test("ModelLink catalog partitions protocols and maps actual per-protocol capabi
   );
 });
 
+test("missing catalog limits inherit defaults and old null snapshots are normalized on read", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "zcode-modellink-limits-"));
+  const file = join(dir, "provider_config.json");
+  const options = {
+    zcodeBuiltinFilePath: bundled,
+    personalFilePath: file,
+    personalPollingIntervalMs: false as const,
+  };
+  let runtime = new NodeProviderConfigRuntime(options);
+  try {
+    const { providerId } = await runtime.configService.createPersonalProvider({
+      providerName: "ModelLink Chat",
+      catalogSource: "modellink",
+      initialConfig: parseProviderConfig({
+        api: { type: "openai-chat-completions", baseUrl: "http://127.0.0.1:32123/v1" },
+        access: { type: "api-key", apiKey: "test-only" },
+      }),
+    });
+    const models = normalizeModelLinkCatalog(
+      {
+        data: [
+          {
+            id: "unknown-limits",
+            modellink: {
+              preferred_protocol: "chat_completions",
+              protocols: { chat_completions: {} },
+            },
+          },
+          model("known-limits", "chat_completions"),
+        ],
+      },
+      "openai-chat-completions",
+    );
+    assert.equal(models[0]!.config.optionSpecs?.maxOutputTokens?.max, undefined);
+    assert.equal(models[0]!.config.properties?.contextWindow, undefined);
+    await runtime.configService.saveModelCatalog(
+      providerId,
+      models,
+      (await runtime.personalRepository.read()).revision,
+    );
+    const resolveModels = async () =>
+      new ProviderConfigResolver()
+        .resolve({
+          ...(await runtime.configService.read()),
+          accountProviders: ProviderConfigMap.empty(),
+        })
+        .registryProviders.find((provider) => provider.providerId === providerId)!.models;
+    const available = await resolveModels();
+    assert.deepEqual(
+      available.map((item) => item.modelId),
+      ["unknown-limits", "known-limits"],
+    );
+    assert.equal(available[0]!.config.optionSpecs.maxOutputTokens.max, 32000);
+    assert.equal(available[0]!.config.properties.contextWindow, 200000);
+    assert.equal(available[1]!.config.optionSpecs.maxOutputTokens.max, 4096);
+
+    runtime.dispose();
+    const saved = JSON.parse(await readFile(file, "utf8"));
+    const oldConfig = saved.config.modelCatalogs[providerId].models[0].config;
+    oldConfig.optionSpecs.maxOutputTokens.max = null;
+    oldConfig.properties.contextWindow = null;
+    await writeFile(file, JSON.stringify(saved));
+    runtime = new NodeProviderConfigRuntime(options);
+    assert.equal((await resolveModels()).length, 2);
+    const canonical = JSON.parse(await readFile(file, "utf8"));
+    const restored = canonical.config.modelCatalogs[providerId].models[0].config;
+    assert.equal("max" in restored.optionSpecs.maxOutputTokens, false);
+    assert.equal("contextWindow" in restored.properties, false);
+  } finally {
+    runtime.dispose();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("catalog snapshot survives restart, preserves manual overrides and rejects stale writes", async () => {
   const dir = await mkdtemp(join(tmpdir(), "zcode-modellink-"));
   const file = join(dir, "provider_config.json");

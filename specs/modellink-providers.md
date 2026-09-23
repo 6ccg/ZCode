@@ -19,15 +19,15 @@
 5. 成功目录中下架的模型保留身份并标记不可选；历史会话不改指向，不自动换模型。目录失败保留已有快照。用户可显式转为手动管理。
 6. 地址、Key 或渠道类型发生变化时，在同次提交中使旧目录失效；普通保存不清空目录。网络请求不持有写锁，提交前检查渠道与 revision，过期响应不覆盖新配置。
 
-| 能力             | 规则                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------ |
-| 上下文和最大输出 | 使用明确目录值，覆盖名称猜测；缺失时保留未知并要求补齐，不把通用默认当成服务保证                 |
-| 图像输入         | 仅按当前协议明确声明启用                                                                         |
-| 音频、视频、PDF  | 两个 ModelLink 渠道固定关闭，编辑器不提供开启入口                                                |
-| 工具             | 复用现有函数工具与协议编码；单项工具成功不代表所有工具形态可用                                   |
-| 联网搜索         | 仅同步 `supportsNativeWebSearch` 标记，未知为 false；不补 ZCode 搜索适配能力，也不宣称可实际调用 |
-| 结构化输出       | ModelLink 默认 true；目录明确 false 或手动关闭可覆盖，不增加严格输出实现或专项探测               |
-| 推理             | 使用公开档位与默认值，按协议编码；不强加不存在的 none/off 档位                                   |
+| 能力             | 规则                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 上下文和最大输出 | 使用明确的正整数目录值；缺失时不写覆盖，继承 ZCode 推荐规则，无需用户补填。继承值是客户端默认配置，不代表服务端能力保证 |
+| 图像输入         | 仅按当前协议明确声明启用                                                                                                |
+| 音频、视频、PDF  | 两个 ModelLink 渠道固定关闭，编辑器不提供开启入口                                                                       |
+| 工具             | 复用现有函数工具与协议编码；单项工具成功不代表所有工具形态可用                                                          |
+| 联网搜索         | 仅同步 `supportsNativeWebSearch` 标记，未知为 false；不补 ZCode 搜索适配能力，也不宣称可实际调用                        |
+| 结构化输出       | ModelLink 默认 true；目录明确 false 或手动关闭可覆盖，不增加严格输出实现或专项探测                                      |
+| 推理             | 使用公开档位与默认值，按协议编码；不强加不存在的 none/off 档位                                                          |
 
 ## 持久化与原版轮流使用
 
@@ -35,6 +35,7 @@
 - 原版只接受 v1 的 `provider_config.json`。修改版默认使用同目录的 `provider_config.zcode-modified.json`，schemaVersion 为 2。
 - 修改版文件缺席时，文件仓库只读原版配置并一次性建立 v2 快照，保留原有渠道、个人规则和默认选择；不升级写回原版文件。快照建立后，两版的模型配置不自动互相同步。
 - 共存实现集中在 `PERSONAL_PROVIDER_CONFIG_FILE_NAME` 与现有文件仓库。Host、Agent、独立 CLI 和 provisioning 沿用原接口和默认路径常量，不添加各自的迁移分支。
+- ModelLink 目录中的空上下文/最大输出字段统一按“未提供”处理。旧快照中的 `null` 在目录解析边界移除，由文件仓库已有规范化写回路径一次性落盘；不改变个人手动覆盖，不新增版本或状态文件。
 - 应用名、单实例锁及普通用户数据目录保持原有语义；两版轮流使用。未验证同时编辑同一任务的跨版本并发行为。
 
 v2 的新增字段为 `config.modelCatalogs` 与 `config.auxiliaryModelSelection`；后者保存 `providerId`、`modelId` 和 `options.reasoningLevel`。目录和辅助选择通过已有 provisioning 同步，不再写一份到 setting.json。
@@ -66,7 +67,7 @@ flowchart LR
 
 ## 验证
 
-- `packages/provider-node/test/modellinkCatalog.test.ts`：分协议导入、URL 查询、手动覆盖、目录失效、重启恢复及过期提交。
+- `packages/provider-node/test/modellinkCatalog.test.ts`：分协议导入、URL 查询、手动覆盖、目录失效、重启恢复及过期提交；缺失能力值继承默认且模型可选，旧目录空值规范化后重启仍可用。
 - `packages/services/test/providerConfigMigration.test.ts` 与 `providerConfigVersionCoexistence.test.ts`：配置迁移、原版文件不改写及修改版快照不被后续原版保存覆盖。
 - `apps/zcode-cli/packages/adapters/test/modellink-auxiliary-runtime.test.ts`：实际 AgentRuntime/AI SDK 对本地 HTTP 夹具发出 Responses 主请求与指定 Chat/high 辅助请求，并验证工具续轮、图像和流式结束。
 - 隔离界面已验证两种渠道创建、获取模型、辅助模型/档位重载保留；构建默认地址验证了未设置留空、设置后预填、已有地址不覆盖、用户修改后保留。
