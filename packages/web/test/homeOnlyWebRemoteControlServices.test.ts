@@ -33,6 +33,10 @@ describe("createHomeOnlyWebRemoteControlServices", () => {
     const { createHomeOnlyWebRemoteControlServices } = await import("../src/main.js");
     const services = createHomeOnlyWebRemoteControlServices();
 
+    await expect(services.settingService.getBuiltinPrompts()).resolves.toEqual({});
+    await expect(
+      services.settingService.setBuiltinPrompt("main.desktop", "offline override"),
+    ).rejects.toThrow("not available before a Web remote control workspace bridge is connected");
     await expect(services.oauthService.restoreCachedSession()).resolves.toBeNull();
     await expect(services.modelSelectionService.getView()).resolves.toEqual({
       revision: 0,

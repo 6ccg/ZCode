@@ -1,6 +1,7 @@
 import { access, readFile, mkdir, rename } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { BUILTIN_PROMPT_FILE_NAME } from "@zcode/shared/builtin-prompts";
 import type {
   AppSettings,
   ProviderFamilyDomain,
@@ -19,6 +20,7 @@ import { isEffectiveDevelopmentNodeEnv } from "../runtime-tools/nodeEnv.js";
 import { maybeThrowInjectedFsFault } from "../fs/fsFaultInjection.js";
 import { atomicWriteText } from "../fs/atomicFileUtils.js";
 import { withSettingsWriteQueueTimeout } from "./settingsWriteQueue.js";
+import { createBuiltinPromptStore } from "./builtinPromptWriter.js";
 import {
   migrateLegacyAccountConnectionSettings,
   needsLegacyAccountConnectionMigration,
@@ -273,6 +275,7 @@ export function createSettingServiceWithMigrations(): {
   };
 
   const service: ISettingService = {
+    ...createBuiltinPromptStore(join(getSettingsDir(), BUILTIN_PROMPT_FILE_NAME)),
     async get(): Promise<AppSettings> {
       // 设置切换后可能立即创建或冷恢复 Session；读取若越过已入队写入，
       // runtime 会固定旧开关值。先等待现有写队列，保证启动偏好读取到已提交的选择。

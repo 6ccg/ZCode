@@ -5,6 +5,7 @@ import {
 } from "../subagent/definitions.js";
 import { DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY, resolveExecutionState } from "@zcode/shared";
 import type { BackgroundBashOutputResult } from "@zcode/shared";
+import type { BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 import {
   createDenyPermissionBroker,
   createRootTraceContext,
@@ -186,6 +187,7 @@ export class AgentRuntime {
   private memoryDreamLastScanAtMs = 0;
   private pendingMemoryUpdate?: ProjectMemoryUpdate;
   private contextSourcePort?: ContextSourcePort;
+  private builtinPromptSource?: BuiltinPromptSource;
   private skillPort?: SkillPort;
   private mcpPort?: McpPort;
   private mcpStartupPromise?: Promise<McpConnectionSnapshot>;
@@ -259,6 +261,7 @@ export class AgentRuntime {
     // 3.12.2：兼容旧 Host/内部调用传入 legacy，但本版本 Runtime、日志和子 Agent 只使用 preflight。
     this.config = projectPersistentAgentMemoryTools({
       ...config,
+      builtinPromptOverrides: { ...config.builtinPromptOverrides },
       modelContextBudgetStrategy: DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
     });
     Object.assign(this.config, resolveExecutionState(config));
@@ -316,6 +319,7 @@ export class AgentRuntime {
     this.runtimeCommandQueue = createRuntimeCommandQueue();
     this.workingDirectory = config.workingDirectory ?? ".";
     this.contextSourcePort = deps.contextSourcePort;
+    this.builtinPromptSource = deps.builtinPromptSource;
     this.skillPort = deps.skillPort;
     this.mcpPort = deps.mcpPort;
     this.runtimeTaskRegistry = deps.runtimeTaskRegistry ?? new InMemoryRuntimeTaskRegistry();

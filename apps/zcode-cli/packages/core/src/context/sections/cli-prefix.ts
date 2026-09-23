@@ -4,11 +4,10 @@
 
 import type { ContextSection } from "../types.js";
 import { estimateTokens } from "../utils.js";
+import { renderBuiltinPrompt, type BuiltinPromptOverrides } from "@zcode/shared/builtin-prompts";
 
-const CLI_PREFIX_PROMPT = "You are ZCode, an interactive coding agent";
-
-export function buildCliPrefixSection(): ContextSection {
-  const content = CLI_PREFIX_PROMPT;
+export function buildCliPrefixSection(overrides?: BuiltinPromptOverrides): ContextSection {
+  const content = renderBuiltinPrompt("main.prefix", overrides);
 
   return {
     name: "CLI Prefix",

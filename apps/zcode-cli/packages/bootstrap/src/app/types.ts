@@ -1,3 +1,4 @@
+import type { BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 import type { AiSdkModelAdapter } from "@zcode/adapters/model";
 import type {
   AgentTelemetryRuntimeOwner,
@@ -135,6 +136,7 @@ export type RevokeWorkspaceHookTrustInput =
 export type ZCodeAppRuntimeConfigInput = AgentRuntimeConfig;
 
 export interface ZCodeAppOptions {
+  builtinPromptSource?: BuiltinPromptSource;
   sessionId?: SessionId;
   resume?: boolean;
   version?: string;

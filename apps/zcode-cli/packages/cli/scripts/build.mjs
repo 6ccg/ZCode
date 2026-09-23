@@ -204,6 +204,11 @@ export const resolveBuildAliases = ({
     rootDirectory,
     "../../packages/shared/src/request-security-edition/index.ts",
   ),
+  // 提示词子入口必须先精确映射，否则通用 alias 会拼成 index.ts/builtin-prompts。
+  "@zcode/shared/builtin-prompts": resolve(
+    rootDirectory,
+    "../../packages/shared/src/builtin-prompts/index.ts",
+  ),
   "@zcode/shared": resolve(rootDirectory, "../../packages/shared/src/index.ts"),
   "@zcode/core": resolve(cliDirectory, "../core/dist/index.js"),
 });

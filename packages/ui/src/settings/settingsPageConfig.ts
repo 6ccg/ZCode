@@ -56,6 +56,12 @@ const BASE_SETTINGS_SECTION_GROUPS: Array<{
 
 const BASE_SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
   {
+    id: "builtinPrompts",
+    icon: FileSearch,
+    titleId: "settings.builtinPrompts.title",
+    groupId: "agentCapabilities",
+  },
+  {
     id: "general",
     icon: Settings2,
     titleId: "settings.systemTitle",
