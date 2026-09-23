@@ -2253,6 +2253,8 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.createCustomProvider": "创建自定义供应商",
   "settings.modelProvider.templateCreateFailed": "创建供应商失败：个人供应商配置格式无效",
   "settings.modelProvider.templateCreateRetry": "重试",
+  "settings.modelProvider.officialPlansDisabled":
+    "当前版本已禁用智谱 / Z.ai 官方套餐，请在模型设置中使用普通 API 或自定义渠道。",
   "settings.modelProvider.edit": "编辑",
   "settings.modelProvider.editModel": "编辑模型配置",
   "settings.modelProvider.editModelDescription": "编辑这个模型的上下文窗口。",

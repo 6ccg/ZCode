@@ -1,4 +1,8 @@
 import { useCodingPlanEntryGate } from "@/settings/CodingPlanEntryButton.js";
+import {
+  ZHIPU_OFFICIAL_PLANS_ENABLED,
+  isZhipuOfficialPlanDisabled,
+} from "@/lib/officialPlanAvailability.js";
 /* eslint-disable max-lines -- Model Provider 详情页当前集中编排 Plan Card、API Key 表单和 OAuth 套餐态；后续稳定后再按 family/API/OAuth 拆分。 */
 import {
   BIGMODEL_PROVIDER_ID,
@@ -392,6 +396,20 @@ export function ModelProviderSectionDetail({
 
   if (!selectedNavItem) {
     return <ModelProviderLoadingCard loadingLabel={loadingLabel} />;
+  }
+
+  // UI 开关不删除渠道；停在占位卡，避免已有配置或导航链接重新打开套餐表单。
+  if (
+    !ZHIPU_OFFICIAL_PLANS_ENABLED &&
+    (selectedNavItem.type !== "custom" ||
+      isZhipuOfficialPlanDisabled(selectedNavItem.provider.config.access?.type))
+  ) {
+    return (
+      <PresetProviderPlaceholderCard
+        displayName={selectedNavItem.label}
+        messageId="settings.modelProvider.officialPlansDisabled"
+      />
+    );
   }
 
   if (selectedNavItem.type === "preset") {

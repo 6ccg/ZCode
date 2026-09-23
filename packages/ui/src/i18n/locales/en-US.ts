@@ -2403,6 +2403,8 @@ const enUS: Record<string, string> = {
   "settings.modelProvider.templateCreateFailed":
     "Failed to create provider: invalid personal provider configuration",
   "settings.modelProvider.templateCreateRetry": "Retry",
+  "settings.modelProvider.officialPlansDisabled":
+    "Z.ai / BigModel official plans are disabled in this build. Use a standard API or custom provider in model settings.",
   "settings.modelProvider.edit": "Edit",
   "settings.modelProvider.editModel": "Edit model settings",
   "settings.modelProvider.editModelDescription": "Edit the context window for this model.",
