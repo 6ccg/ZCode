@@ -17,6 +17,17 @@ rules:
     - "evidence-only"
 
 nodes:
+  - id: "surface.auxiliary-model-selection"
+    kind: "ui-surface"
+    label: "Auxiliary text model and reasoning selection"
+    aliases: ["辅助模型", "标题模型", "辅助思维"]
+    codeSeeds:
+      - file: "packages/ui/src/settings/model-provider-section/AuxiliaryModelSelector.tsx"
+        symbol: "AuxiliaryModelSelector"
+      - file: "apps/zcode-cli/packages/core/src/runtime/methods/title-generation-sidecar.ts"
+        symbol: "generateTitleCandidate"
+    invariants:
+      - "The selected auxiliary reasoning level is preserved; it never changes the main session selection."
   - id: "capability.modellink-catalog"
     kind: "capability"
     label: "ModelLink protocol channels and imported model capabilities"
@@ -5033,6 +5044,14 @@ nodes:
         symbol: "BotTopicPreparationList"
 
 edges:
+  - from: "capability.model-selection"
+    to: "surface.auxiliary-model-selection"
+    type: "renders-in"
+    rank: "must-inspect"
+  - from: "surface.auxiliary-model-selection"
+    to: "shared-ui.model-config-select"
+    type: "shares-component"
+    rank: "must-inspect"
   - from: "capability.modellink-catalog"
     to: "service.host-model-selection"
     type: "options-from"

@@ -35,6 +35,7 @@ export interface ProviderConfigLayerSnapshot {
   readonly providerOrder?: readonly ProviderId[];
   readonly defaultModelSelection?: ModelSelection;
   readonly modelCatalogs?: ModelCatalogs;
+  readonly auxiliaryModelSelection?: ModelSelection;
 }
 
 export interface ProviderConfigLayerUpdate {
@@ -44,6 +45,7 @@ export interface ProviderConfigLayerUpdate {
   readonly providerOrder?: readonly ProviderId[];
   readonly defaultModelSelection?: ModelSelection;
   readonly modelCatalogs?: ModelCatalogs;
+  readonly auxiliaryModelSelection?: ModelSelection;
 }
 
 export interface PersonalProviderConfigRepository extends ProviderSource<ProviderConfigLayerSnapshot> {
@@ -136,6 +138,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       personalModels: personal.models,
       personalProviderOrder: personal.providerOrder ?? [],
       modelCatalogs: personal.modelCatalogs ?? {},
+      auxiliaryModelSelection: personal.auxiliaryModelSelection,
     });
   }
 
@@ -365,6 +368,12 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
         modelCatalogs: { ...current.modelCatalogs, [providerId]: catalog },
       };
     });
+  }
+
+  saveAuxiliaryModelSelection(
+    selection: ModelSelection | undefined,
+  ): Promise<ProviderConfigLayerSnapshot> {
+    return this.#updatePersonal((current) => ({ ...current, auxiliaryModelSelection: selection }));
   }
 
   async detachCatalogModel(
@@ -699,6 +708,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       // Provider/Model/排序只修改自己的成员，不能因共用文件清掉默认选择。
       defaultModelSelection: current.defaultModelSelection,
       modelCatalogs: current.modelCatalogs,
+      auxiliaryModelSelection: current.auxiliaryModelSelection,
       ...transform(current),
     }));
   }

@@ -161,7 +161,9 @@ function shouldDeferSessionTitleForRuntimeHeaders(runtime: AgentRuntimeInternal)
   const runtimeHeadersPort = runtime.providerRuntimeHeadersPort;
   if (!runtimeHeadersPort) return false;
   const selection =
-    runtime.config.titleGeneration?.modelSelection ?? runtime.getSessionModelSelection();
+    runtime.config.titleGeneration?.modelSelection ??
+    runtime.modelCatalogPort?.getAuxiliaryModelSelection?.() ??
+    runtime.getSessionModelSelection();
   if (!selection) return true;
   return (
     runtimeHeadersPort.shouldRefreshBeforeModelRequest?.({

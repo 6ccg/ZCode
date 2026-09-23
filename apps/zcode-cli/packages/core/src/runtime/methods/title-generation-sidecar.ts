@@ -93,13 +93,17 @@ async function generateTitleCandidateImpl(
     traceContext: TraceContext;
   },
 ): Promise<{ modelSelection: ModelSelection; title: string; traceContext: TraceContext } | null> {
-  const requestedModelSelection =
-    this.config.titleGeneration?.modelSelection ?? this.getSessionModelSelection();
+  const explicitSelection =
+    this.config.titleGeneration?.modelSelection ??
+    this.modelCatalogPort?.getAuxiliaryModelSelection?.();
+  const requestedModelSelection = explicitSelection ?? this.getSessionModelSelection();
   if (!requestedModelSelection) return null;
   const baseModel = createRuntimeModel(this, {
     selection: requestedModelSelection,
   });
-  const model = baseModel.bind(auxiliaryModelOptions(baseModel));
+  const model = baseModel.bind(
+    auxiliaryModelOptions(baseModel, explicitSelection?.options?.reasoningLevel),
+  );
   const modelSelection = cloneModelSelection(requestedModelSelection);
   const modelTraceContext = createChildTraceContext(options.traceContext, {
     attributes: {
