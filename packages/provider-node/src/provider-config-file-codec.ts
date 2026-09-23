@@ -6,14 +6,26 @@ import {
   parsePersonalProviderConfigMap,
   extractManualModelConfig,
   manualModelConfigSchema,
+  modelCatalogsSchema,
   type ProviderConfigLayerUpdate,
 } from "@zcode/provider";
 
-const CURRENT_SCHEMA_VERSION = 1 as const;
+const CURRENT_SCHEMA_VERSION = 2 as const;
 
 type ProviderConfigFileMigration = (input: unknown) => unknown;
 
-const migrations: ReadonlyMap<number, ProviderConfigFileMigration> = new Map();
+const migrations: ReadonlyMap<number, ProviderConfigFileMigration> = new Map([
+  [
+    1,
+    (input) => {
+      const prior = z
+        .object({ schemaVersion: z.literal(1), config: z.record(z.string(), z.unknown()) })
+        .strict()
+        .parse(input);
+      return { ...prior, schemaVersion: 2, config: { ...prior.config, modelCatalogs: {} } };
+    },
+  ],
+]);
 
 const storedProviderConfigSchema = z
   .object({
@@ -24,6 +36,8 @@ const storedProviderConfigSchema = z
         providerConfigRules: z.unknown(),
         modelConfigRules: z.unknown(),
         defaultModelSelection: modelSelectionSchema.optional(),
+        modelCatalogs: modelCatalogsSchema.default({}),
+        auxiliaryModelSelection: modelSelectionSchema.optional(),
       })
       .strict(),
   })
@@ -75,6 +89,8 @@ export function decodeProviderConfigFile(input: unknown): ProviderConfigLayerUpd
       normalizeLegacyManualRules(parsed.config.modelConfigRules),
     ),
     providerOrder: parsed.config.providerOrder,
+    modelCatalogs: parsed.config.modelCatalogs,
+    auxiliaryModelSelection: parsed.config.auxiliaryModelSelection,
     ...(parsed.config.defaultModelSelection === undefined
       ? {}
       : { defaultModelSelection: parsed.config.defaultModelSelection }),
@@ -116,6 +132,10 @@ export function encodeProviderConfigFile(update: ProviderConfigLayerUpdate) {
       ...(update.providerOrder === undefined ? {} : { providerOrder: update.providerOrder }),
       providerConfigRules: { providerRules: update.providers.toJSON() },
       modelConfigRules: update.models.toPersonalJSON(),
+      modelCatalogs: update.modelCatalogs ?? {},
+      ...(update.auxiliaryModelSelection === undefined
+        ? {}
+        : { auxiliaryModelSelection: update.auxiliaryModelSelection }),
       ...(update.defaultModelSelection === undefined
         ? {}
         : { defaultModelSelection: update.defaultModelSelection }),
