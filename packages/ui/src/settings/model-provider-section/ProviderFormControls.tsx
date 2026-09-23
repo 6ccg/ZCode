@@ -14,6 +14,8 @@ import { shouldShowModelVisionBadge } from "@/lib/modelVisionBadge.js";
 import { useProviderDetailFeedback } from "@/settings/model-provider-section/ProviderDetailFeedback.js";
 
 export function ModelRowInput({
+  onDetachCatalogModel,
+  restrictedMedia,
   model,
   providerId,
   providerName = providerId,
@@ -28,6 +30,8 @@ export function ModelRowInput({
   onEnabledChange,
   onTest,
 }: {
+  restrictedMedia?: boolean;
+  onDetachCatalogModel?: () => Promise<void>;
   model: ProviderSettingsFormModel;
   providerId: string;
   providerName?: string;
@@ -288,6 +292,7 @@ export function ModelRowInput({
           </Button>
         ) : null}
         <ProviderModelMetadataDialog
+          restrictedMedia={restrictedMedia}
           onRestore={() => {
             setDraftErrorField(null);
             setCommitErrorMessage(null);
@@ -315,6 +320,16 @@ export function ModelRowInput({
           }}
           modelIdReadOnly={model.builtin}
         />
+        {onDetachCatalogModel ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => void onDetachCatalogModel()}
+          >
+            {intl.formatMessage({ id: "settings.modelProvider.detachCatalogModel" })}
+          </Button>
+        ) : null}
         {onDelete ? (
           <Button
             type="button"

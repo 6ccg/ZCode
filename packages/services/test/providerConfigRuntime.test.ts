@@ -54,7 +54,7 @@ describe("ProviderConfigRuntime", () => {
       const root = await mkdtemp(join(tmpdir(), "zcode-provider-import-failure-"));
       const configDir = join(root, ".zcode", "v2");
       const legacyFilePath = join(configDir, "config.json");
-      const personalFilePath = join(configDir, "provider_config.json");
+      const personalFilePath = join(configDir, "provider_config.zcode-modified.json");
       const zcodeBuiltinFilePath = join(root, "builtin.json");
       const secret = "PRIVATE_KEY_MUST_NOT_APPEAR_IN_ERRORS";
       const invalidText =
@@ -139,8 +139,8 @@ describe("ProviderConfigRuntime", () => {
       expect((await runtime.configService.read()).personalProviders.keys()).toEqual([]);
       expect(recovery).not.toHaveBeenCalled();
       await expect(
-        readFile(join(root, ".zcode/v2/provider_config.json"), "utf8"),
-      ).resolves.toContain('"schemaVersion": 1');
+        readFile(join(root, ".zcode/v2/provider_config.zcode-modified.json"), "utf8"),
+      ).resolves.toContain('"schemaVersion": 2');
     } finally {
       runtime.dispose();
       setDataBaseDir(null);
@@ -205,7 +205,7 @@ describe("ProviderConfigRuntime", () => {
     }
   });
 
-  it("从旧 config.json 导入同目录 provider_config.json，不改写旧文件且不备份", async () => {
+  it("从旧 config.json 导入同目录修改版配置，不改写旧文件且不备份", async () => {
     const root = await mkdtemp(join(tmpdir(), "zcode-provider-runtime-"));
     const zcodeBuiltinFilePath = join(root, "zcodeBuiltin.json");
     const configDir = join(root, ".zcode", "v2");
@@ -233,8 +233,8 @@ describe("ProviderConfigRuntime", () => {
       const snapshot = await runtime.configService.read();
 
       await expect(
-        readFile(join(root, ".zcode", "v2", "provider_config.json"), "utf8"),
-      ).resolves.toContain('"schemaVersion": 1');
+        readFile(join(root, ".zcode", "v2", "provider_config.zcode-modified.json"), "utf8"),
+      ).resolves.toContain('"schemaVersion": 2');
       expect(snapshot.personalProviders.keys()).toEqual(["custom-provider"]);
       await expect(readFile(legacyFilePath, "utf8")).resolves.toBe(legacyText);
       expect((await readdir(configDir)).some((name) => name.endsWith(".bak"))).toBe(false);
@@ -275,7 +275,7 @@ describe("ProviderConfigRuntime", () => {
       properties: { contextWindow: 128_000 },
     });
     expect(JSON.parse(await readFile(personalFilePath, "utf8"))).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       config: {
         providerConfigRules: {
           providerRules: [

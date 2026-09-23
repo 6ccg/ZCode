@@ -6,6 +6,7 @@ import {
   type ModelConfigRules,
 } from "./config/index.js";
 import type { AccountProviderStates } from "./account-provider-state.js";
+import type { ModelCatalogs } from "./model-catalog.js";
 
 export interface ProviderSource<TSnapshot> {
   read(): Promise<TSnapshot>;
@@ -22,6 +23,7 @@ export interface ProviderConfigSnapshot {
   readonly zcodeBuiltinModelRules: ModelConfigRules;
   readonly personalModels: ModelConfigRules;
   readonly personalProviderOrder?: readonly string[];
+  readonly modelCatalogs?: ModelCatalogs;
 }
 
 export interface AccountProviderConfigSnapshot {
