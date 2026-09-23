@@ -13,6 +13,7 @@ import { createRegistrySelectionProtocolError } from "./provider-registry-select
 export type RuntimeModelFactory = NonNullable<AgentRuntimeDeps["modelFactory"]>;
 
 export interface ProviderRegistryModelSource {
+  getAuxiliaryModelSelection?(): ModelSelection | undefined;
   getView(): ProviderRegistryView;
   getProvider(providerId: string): Provider | undefined;
   getModel(providerId: string, modelId: string): ProviderModel | undefined;
@@ -81,8 +82,7 @@ export class ApiProviderModelRuntime {
       // 门禁一一对应：漏掉 highspeed 会在这里丢掉 source，导致 runner 端 requestAuth 缺失、
       // 本轮在发送前抛 model_request_auth_missing。
       ...(provider.config.access.type === "zhipu-account" &&
-      (provider.config.access.mode === "off-peak" ||
-        provider.config.access.mode === "highspeed")
+      (provider.config.access.mode === "off-peak" || provider.config.access.mode === "highspeed")
         ? {
             requestDependencies: {
               requestAuth: {
