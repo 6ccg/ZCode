@@ -101,7 +101,7 @@ export class ContextBuilder {
     // 「You are ZCode, an interactive coding agent」对一个
     // 只对脚本说话、可能连读文件工具都没有的子代理是错的身份，且走在正确身份段前面。
     if (!isWorkflowActor) {
-      sections.push(buildCliPrefixSection());
+      sections.push(buildCliPrefixSection(this.config.builtinPromptOverrides));
     }
 
     // 2. Stable agent behavior or custom prompt body
@@ -118,7 +118,7 @@ export class ContextBuilder {
     } else if (workflowActor !== undefined) {
       sections.push(buildWorkflowActorIdentitySection(workflowActor));
     } else {
-      sections.push(buildIdentitySection(activeOutputStyle));
+      sections.push(buildIdentitySection(activeOutputStyle, this.config.builtinPromptOverrides));
     }
 
     // 3. Dynamic system context
@@ -129,12 +129,12 @@ export class ContextBuilder {
     // guidance——契约里已把 Report outcomes faithfully 搬过去），保留 memory 与其后各段。
     if (!hasCustomSystemPrompt) {
       if (!isWorkflowActor && this.config.presentationSurface === "zcode_desktop") {
-        sections.push(buildDesktopContextSection());
+        sections.push(buildDesktopContextSection(this.config.builtinPromptOverrides));
       }
 
       // behaviour part right after stable sp...
       if (!isWorkflowActor) {
-        sections.push(buildDynamicBehaviorSection());
+        sections.push(buildDynamicBehaviorSection(this.config.builtinPromptOverrides));
       }
 
       // Session-specific guidance
@@ -143,6 +143,7 @@ export class ContextBuilder {
         : buildSessionGuidanceSection(
             this.config.guidanceToolNames ?? [],
             (this.config.skills?.skills.length ?? 0) > 0,
+            this.config.builtinPromptOverrides,
           );
       if (sessionGuidanceSection) {
         sections.push(sessionGuidanceSection);
@@ -150,7 +151,10 @@ export class ContextBuilder {
 
       // Memory
       if (this.config.memoryRoot) {
-        const memorySection = buildMemorySection(this.config.memoryRoot);
+        const memorySection = buildMemorySection(
+          this.config.memoryRoot,
+          this.config.builtinPromptOverrides,
+        );
         if (memorySection) {
           sections.push(memorySection);
         }
@@ -164,7 +168,7 @@ export class ContextBuilder {
       }
 
       // Context Management
-      sections.push(buildContextManagementSection());
+      sections.push(buildContextManagementSection(this.config.builtinPromptOverrides));
 
       const gitSystemContextSection = buildGitSystemContextSection(this.config.envInfo);
       if (gitSystemContextSection) {

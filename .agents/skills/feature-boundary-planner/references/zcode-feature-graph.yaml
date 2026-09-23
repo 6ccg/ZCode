@@ -25,6 +25,49 @@ rules:
     - invariant-only
     - evidence-only
 nodes:
+  - id: surface.builtin-prompt-editor
+    kind: ui-surface
+    label: Built-in prompt settings editor
+    aliases: [内置提示词, 系统提示词, 提示词编辑]
+    codeSeeds:
+      - file: packages/ui/src/settings/BuiltinPromptsSection.tsx
+        symbol: BuiltinPromptsSection
+      - file: packages/ui/src/hooks/useBuiltinPrompts.ts
+        symbol: useBuiltinPrompts
+    invariants:
+      - "The editor targets the base app host; selecting a remote workspace does not switch its settings owner."
+  - id: service.builtin-prompt-settings
+    kind: service
+    label: Settings owner for per-entry prompt overrides
+    codeSeeds:
+      - file: packages/services/src/setting/setting.ts
+        symbol: ISettingService
+      - file: packages/services/src/setting/settingService.ts
+        symbol: createSettingServiceWithMigrations
+      - file: packages/services/src/setting/builtinPromptWriter.ts
+        symbol: createBuiltinPromptStore
+    invariants:
+      - "Per-entry merge and restore lock the independent prompt file across read-modify-write; setting.json is unchanged."
+  - id: capability.builtin-prompt-catalog
+    kind: capability
+    label: Shared default prompt templates and variables
+    codeSeeds:
+      - file: packages/shared/src/builtin-prompts/index.ts
+        symbol: BUILTIN_PROMPTS
+      - file: packages/shared/src/builtin-prompts/index.ts
+        symbol: renderBuiltinPrompt
+  - id: state.builtin-prompt-runtime
+    kind: state
+    label: Session prompt snapshot and auxiliary invocation reads
+    codeSeeds:
+      - file: apps/zcode-cli/packages/adapters/src/context/builtin-prompts.ts
+        symbol: createNodeBuiltinPromptSource
+      - file: apps/zcode-cli/packages/core/src/context/builder.ts
+        symbol: ContextBuilder
+      - file: apps/zcode-cli/packages/core/src/runtime/methods/title-generation-sidecar.ts
+        symbol: generateTitleCandidate
+    invariants:
+      - "Main and built-in child prompts use the root runtime snapshot; auxiliary jobs read once per invocation."
   - id: capability.modellink-catalog
     kind: capability
     label: ModelLink protocol channels and imported model capabilities
@@ -380,6 +423,22 @@ nodes:
       - file: apps/zcode-cli/packages/core/src/runtime/methods/turn-model.ts
         symbol: applySubmissionExecutionState
 edges:
+  - from: surface.builtin-prompt-editor
+    to: service.builtin-prompt-settings
+    type: commits-through
+    rank: must-inspect
+  - from: surface.builtin-prompt-editor
+    to: capability.builtin-prompt-catalog
+    type: options-from
+    rank: must-inspect
+  - from: state.builtin-prompt-runtime
+    to: service.builtin-prompt-settings
+    type: reads-from
+    rank: must-inspect
+  - from: state.builtin-prompt-runtime
+    to: capability.builtin-prompt-catalog
+    type: renders-with
+    rank: must-inspect
   - from: capability.modellink-catalog
     to: service.host-model-selection
     type: options-from

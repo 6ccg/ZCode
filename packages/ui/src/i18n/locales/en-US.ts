@@ -1,5 +1,51 @@
 /** English translations */
 const enUS: Record<string, string> = {
+  "settings.builtinPrompts.title": "Built-in prompts",
+  "settings.builtinPrompts.scope":
+    "Applies to this app host: your desktop computer, or the server connected to Web. Switching remote workspaces does not edit prompts on the remote host.",
+  "settings.builtinPrompts.activation":
+    "Main sessions and their subagents use new settings when a session or runtime is created. Auxiliary prompts apply to the next invocation. Requests already running keep their prompts.",
+  "settings.builtinPrompts.group.main": "Main agent",
+  "settings.builtinPrompts.group.subagent": "Built-in subagents",
+  "settings.builtinPrompts.group.auxiliary": "Auxiliary tasks",
+  "settings.builtinPrompts.modified": "Modified",
+  "settings.builtinPrompts.default": "Default",
+  "settings.builtinPrompts.editor": "Prompt text",
+  "settings.builtinPrompts.viewDefault": "View current default",
+  "settings.builtinPrompts.backToEdit": "Back to editing",
+  "settings.builtinPrompts.variables": "Keep these variables; the runtime fills them in:",
+  "settings.builtinPrompts.variable.identity_intro":
+    "Identity introduction for the active Output Style",
+  "settings.builtinPrompts.variable.memory_root": "Memory directory for this session",
+  "settings.builtinPrompts.variable.search_guidelines": "Guidance for the available search tools",
+  "settings.builtinPrompts.variable.bash_read_only_commands":
+    "Read-only commands for the active search mode",
+  "settings.builtinPrompts.variable.custom_instructions":
+    "Additional instructions for this compaction, or empty",
+  "settings.builtinPrompts.variable.message_count": "Number of messages being processed",
+  "settings.builtinPrompts.variable.existing_memories": "Existing memory files, or empty",
+  "settings.builtinPrompts.guidanceHint":
+    "Only injected when the Skill tool and skills are available. Editing does not change this condition.",
+  "settings.builtinPrompts.format.title":
+    "Session and goal titles share this template. Expected output is JSON with a title string field.",
+  "settings.builtinPrompts.format.gitCommit":
+    "The first line must use Conventional Commit format. Branch, file and diff context is appended automatically.",
+  "settings.builtinPrompts.format.compact":
+    "Preserve the expected analysis and summary tags. Conversation history is supplied by the runtime.",
+  "settings.builtinPrompts.save": "Save",
+  "settings.builtinPrompts.saving": "Saving…",
+  "settings.builtinPrompts.saved": "Prompt saved",
+  "settings.builtinPrompts.saveError": "Save failed: {error}",
+  "settings.builtinPrompts.discard": "Discard changes",
+  "settings.builtinPrompts.restore": "Restore default",
+  "settings.builtinPrompts.restoreDescription":
+    "Remove this override and use the current default. Any unsaved changes will also be discarded.",
+  "settings.builtinPrompts.unsaved": "Unsaved changes",
+  "settings.builtinPrompts.unsavedTitle": "Discard unsaved changes?",
+  "settings.builtinPrompts.unsavedDescription":
+    "This prompt has not been saved. Leaving will discard your draft.",
+  "settings.builtinPrompts.loading": "Loading prompt settings…",
+  "settings.builtinPrompts.retry": "Retry",
   "startPlan.recommendation.subagentDescription":
     "Your Start Plan has quota available for {model}. Switch this subagent’s model to the Start Plan?",
   "startPlan.recommendation.preferenceSaveFailed":

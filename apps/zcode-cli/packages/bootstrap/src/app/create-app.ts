@@ -14,7 +14,10 @@ import { createNodeWebFetchHttpClientAdapter } from "@zcode/adapters/http";
 import { createJimpImageProcessorAdapter } from "@zcode/adapters/image";
 import { createPopplerPdfDocumentAdapter } from "@zcode/adapters/pdf";
 import { createNodeSessionMailboxAdapter } from "@zcode/adapters/mailbox";
-import { createNodeContextSourceAdapter } from "@zcode/adapters/context";
+import {
+  createNodeContextSourceAdapter,
+  createNodeBuiltinPromptSource,
+} from "@zcode/adapters/context";
 import { createNodeSkillAdapter } from "@zcode/adapters/skills";
 import { createMcpAdapter } from "@zcode/adapters/mcp";
 import {
@@ -719,11 +722,17 @@ export async function createZCodeApp(options: ZCodeAppOptions): Promise<ZCodeApp
       logger,
     });
     // 模型目录：工具层把用户说的模型名解析成 workflow run 的子代理选型（model-catalog-port.ts）。
+    const builtinPromptSource =
+      options.builtinPromptSource ?? createNodeBuiltinPromptSource({ env: options.env });
+    // 根会话固定正文快照；辅助操作通过同一端口按调用读取，避免覆盖正在执行的请求。
+    runtimeConfig.builtinPromptOverrides =
+      options.runtimeConfig?.builtinPromptOverrides ?? (await builtinPromptSource.readOverrides());
     const modelCatalogPort = createModelCatalogPort({
       registry: options.providerRegistry,
       currentSelection: () => getRuntime().getSessionModelSelection(),
     });
     runtime = new AgentRuntime(sessionId, runtimeConfig, {
+      builtinPromptSource,
       agentTelemetry: modelTelemetry.agentExecution,
       // 主代理的模型请求过治理器的 observer：立即放行，但让治理器看见它的 429 / 成功。
       modelRequestAdmission: workflowConcurrencyGovernor.observer(),

@@ -6,6 +6,11 @@ import type {
   ZCodeWorkspaceGenerateTextParams,
 } from "@zcode/shared";
 import type { ServiceLogger } from "#src/logger/serviceLogger.js";
+import {
+  renderBuiltinPrompt,
+  type BuiltinPromptOverrides,
+  type BuiltinPromptSource,
+} from "@zcode/shared/builtin-prompts";
 
 const MAX_PROMPT_FILES = 20;
 const MAX_DIFF_FILES = 8;
@@ -38,6 +43,7 @@ interface GitCommitMessageTextGenerator {
 }
 
 interface GitCommitMessageGeneratorOptions {
+  builtinPromptSource?: BuiltinPromptSource;
   currentModelProvider: GitCommitMessageCurrentModelProvider;
   textGenerator: GitCommitMessageTextGenerator;
   logger?: ServiceLogger;
@@ -68,6 +74,7 @@ export class GitCommitMessageGenerator {
   }): Promise<{ message: string; providerId: string; model: string }> {
     const selection = await this.resolveCurrentModel(params);
     const prompt = buildGitCommitMessageGenerationPrompt({
+      builtinPromptOverrides: await this.options.builtinPromptSource?.readOverrides(),
       branchName: params.branchName,
       locale: params.locale,
       files: params.files,
@@ -173,6 +180,7 @@ export class GitCommitMessageGenerator {
 }
 
 function buildGitCommitMessageGenerationPrompt(params: {
+  builtinPromptOverrides?: BuiltinPromptOverrides;
   branchName: string | null;
   locale?: Locale;
   files: readonly GitFileChange[];
@@ -190,19 +198,7 @@ function buildGitCommitMessageGenerationPrompt(params: {
   const conversationSummary = buildConversationContextSummary(params.conversationContext);
 
   return [
-    "Write exactly one Git commit message for the workspace changes below.",
-    "Return only the commit message text.",
-    "",
-    "Hard requirements:",
-    "- The first line must be a valid Conventional Commit subject.",
-    "- Use one of: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert.",
-    "- Keep the Conventional Commit type and optional scope in English.",
-    "- Write the subject and any body in the current language.",
-    "- Keep the subject under 72 characters.",
-    "- Use the current session conversation context only to infer user intent.",
-    "- Do not mention the conversation, chat, prompt, or user request explicitly.",
-    "- Do not explain your reasoning.",
-    "- Do not repeat these instructions.",
+    renderBuiltinPrompt("auxiliary.gitCommit", params.builtinPromptOverrides),
     "",
     `Current branch: ${normalizedBranchName}`,
     `Current language: ${language}`,

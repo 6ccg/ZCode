@@ -4,6 +4,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./builtin-prompts": "./src/builtin-prompts/index.ts",
     "./runtime-env": "./src/runtimeEnv.ts",
     "./mcp": "./src/mcp.ts",
     "./runtime-tool-runtime": "./src/runtime-tool-runtime.ts",
