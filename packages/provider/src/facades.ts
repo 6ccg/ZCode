@@ -11,7 +11,6 @@ import type {
   ProviderTemplateId,
 } from "./config/index.js";
 import {
-  ModelConfigRules,
   ProviderTemplateMap,
   type ProviderConfigRule,
   type ProviderTemplateNameMap,
@@ -33,6 +32,11 @@ import {
   type ModelSelectionProviderClassifier,
 } from "./effective-model-selection.js";
 import type { ModelSelection } from "./registry.js";
+import {
+  resolveCatalogModelConfig,
+  type ModelCatalog,
+  type ModelCatalogs,
+} from "./model-catalog.js";
 import type {
   ProviderRegistryServiceChangedEvent,
   ProviderRegistryServiceSnapshot,
@@ -46,7 +50,10 @@ export interface ProviderRegistryFacadeSource {
 }
 
 export interface ProviderSettingsMutationTarget {
+  refreshModelCatalog?(providerId: ProviderId): Promise<unknown>;
+  detachCatalogModel?(providerId: ProviderId, modelId: ModelId): Promise<unknown>;
   createPersonalProvider(input?: {
+    readonly catalogSource?: "modellink";
     readonly templateId?: ProviderTemplateId;
     readonly providerName?: string;
     readonly locale?: ProviderTemplateLocale;
@@ -104,6 +111,7 @@ export interface ProviderSettingsMutationTarget {
 }
 
 export interface ProviderSettingsModelCandidateView {
+  readonly defaultReasoningLevel?: string;
   readonly kind: "candidate";
   readonly modelId: ModelId;
   readonly builtin: boolean;
@@ -150,6 +158,7 @@ export interface ProviderSettingsProviderView extends Pick<
   ProviderConfigRule,
   "providerName" | "templateId"
 > {
+  readonly catalog?: Pick<ModelCatalog, "source" | "fetchedAt">;
   readonly enabled: boolean;
   readonly accountState?: import("./account-provider-state.js").AccountProviderState;
   readonly providerId: ProviderId;
@@ -224,6 +233,7 @@ export class ProviderSettingsFacade {
       personalModels: snapshot.config.personalModels,
       resolution: snapshot.resolution,
       accountStates: snapshot.account.states,
+      modelCatalogs: snapshot.config.modelCatalogs,
     });
   }
 
@@ -240,16 +250,17 @@ export class ProviderSettingsFacade {
     const snapshot = requireSnapshot(this.#source);
     const provider = requireEffectiveProvider(snapshot, input.providerId);
     if (!("personalConfig" in input)) {
-      const modelRules = ModelConfigRules.composeEffective(
-        snapshot.config.zcodeBuiltinModelRules,
-        snapshot.config.personalModels,
-      );
-      const config = modelRules.resolve({
-        providerId: input.providerId,
-        templateId: provider.templateId,
-        modelId: input.modelId,
-        apiType: provider.config.api?.type,
-        baseUrl: provider.config.api?.baseUrl,
+      const { effective: config } = resolveCatalogModelConfig({
+        builtin: snapshot.config.zcodeBuiltinModelRules,
+        personal: snapshot.config.personalModels,
+        catalogs: snapshot.config.modelCatalogs,
+        identity: {
+          providerId: input.providerId,
+          templateId: provider.templateId,
+          modelId: input.modelId,
+          apiType: provider.config.api?.type,
+          baseUrl: provider.config.api?.baseUrl,
+        },
       });
       return Object.freeze({
         inheritedConfig: config.toJSON(),
@@ -261,13 +272,6 @@ export class ProviderSettingsFacade {
     }
 
     const personalConfig = parseModelConfig(input.personalConfig);
-    const inheritedConfig = snapshot.config.zcodeBuiltinModelRules.resolve({
-      providerId: input.providerId,
-      templateId: provider.templateId,
-      modelId: input.modelId,
-      apiType: provider.config.api?.type,
-      baseUrl: provider.config.api?.baseUrl,
-    });
     let personalRules = snapshot.config.personalModels;
     if (input.originalModelId !== input.modelId) {
       personalRules = personalRules.renameExactModel(
@@ -278,15 +282,17 @@ export class ProviderSettingsFacade {
     }
     // 此入口预览智能配置草稿；固定模式不请求推荐，重新开启时不能沿用旧固定标记。
     personalRules = personalRules.setExact(input.providerId, input.modelId, personalConfig, true);
-    const config = ModelConfigRules.composeEffective(
-      snapshot.config.zcodeBuiltinModelRules,
-      personalRules,
-    ).resolve({
-      providerId: input.providerId,
-      templateId: provider.templateId,
-      modelId: input.modelId,
-      apiType: provider.config.api?.type,
-      baseUrl: provider.config.api?.baseUrl,
+    const { inherited: inheritedConfig, effective: config } = resolveCatalogModelConfig({
+      builtin: snapshot.config.zcodeBuiltinModelRules,
+      personal: personalRules,
+      catalogs: snapshot.config.modelCatalogs,
+      identity: {
+        providerId: input.providerId,
+        templateId: provider.templateId,
+        modelId: input.modelId,
+        apiType: provider.config.api?.type,
+        baseUrl: provider.config.api?.baseUrl,
+      },
     });
     return Object.freeze({
       inheritedConfig: inheritedConfig.toJSON(),
@@ -302,6 +308,7 @@ export class ProviderSettingsFacade {
   }
 
   createPersonalProvider(input?: {
+    readonly catalogSource?: "modellink";
     readonly templateId?: ProviderTemplateId;
     readonly providerName?: string;
     readonly locale?: ProviderTemplateLocale;
@@ -309,6 +316,7 @@ export class ProviderSettingsFacade {
   }): Promise<ProviderSettingsCreationResult> {
     return this.#mutateWithResult("create-provider", (target) =>
       target.createPersonalProvider({
+        ...(input?.catalogSource ? { catalogSource: input.catalogSource } : {}),
         ...(input?.templateId ? { templateId: input.templateId } : {}),
         ...(input?.providerName ? { providerName: input.providerName } : {}),
         ...(input?.locale ? { locale: input.locale } : {}),
@@ -332,6 +340,20 @@ export class ProviderSettingsFacade {
         metadata,
       ),
     );
+  }
+
+  refreshModelCatalog(providerId: ProviderId): Promise<ProviderSettingsView> {
+    return this.#mutateProvider(providerId, "refresh-catalog", (target) => {
+      if (!target.refreshModelCatalog) throw new Error("当前 Host 不支持模型目录获取");
+      return target.refreshModelCatalog(providerId);
+    });
+  }
+
+  detachCatalogModel(providerId: ProviderId, modelId: ModelId): Promise<ProviderSettingsView> {
+    return this.#mutateProvider(providerId, "detach-catalog-model", (target) => {
+      if (!target.detachCatalogModel) throw new Error("当前 Host 不支持目录模型转为手动模型");
+      return target.detachCatalogModel(providerId, modelId);
+    });
   }
 
   deletePersonalProvider(providerId: ProviderId): Promise<ProviderSettingsView> {
@@ -603,6 +625,7 @@ function requireEffectiveProvider(
 }
 
 function createProviderSettingsView(input: {
+  modelCatalogs?: ModelCatalogs;
   revision: number;
   zcodeBuiltinProviders: ProviderRegistryServiceSnapshot["config"]["zcodeBuiltinProviders"];
   zcodeBuiltinProviderTemplates: ProviderRegistryServiceSnapshot["config"]["zcodeBuiltinProviderTemplates"];
@@ -621,6 +644,14 @@ function createProviderSettingsView(input: {
       providerName: provider.providerName,
       templateId: provider.templateId,
       enabled: provider.enabled,
+      ...(input.modelCatalogs?.[provider.providerId]
+        ? {
+            catalog: {
+              source: input.modelCatalogs[provider.providerId]!.source,
+              fetchedAt: input.modelCatalogs[provider.providerId]!.fetchedAt,
+            },
+          }
+        : {}),
       ...(input.accountStates?.[provider.providerId]
         ? { accountState: input.accountStates[provider.providerId] }
         : {}),
@@ -645,6 +676,9 @@ function createProviderSettingsView(input: {
           return Object.freeze({
             kind: model.kind,
             modelId: model.modelId,
+            defaultReasoningLevel: input.modelCatalogs?.[provider.providerId]?.models.find(
+              (item) => item.modelId === model.modelId,
+            )?.defaultReasoningLevel,
             builtin: model.source === "builtin",
             effectiveBuiltinConfig: model.effectiveBuiltinConfig.toJSON(),
             ...(personalModelConfig ? { personalExactConfig: personalModelConfig.toJSON() } : {}),
