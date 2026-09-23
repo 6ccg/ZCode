@@ -247,6 +247,7 @@ export function ModelProviderSectionDetail({
   onSavePersonalModelDraft,
   onSetPersonalModelEnabled,
   onDeletePersonalModel,
+  onDetachCatalogModel,
   onDelete,
   onReorderProviderModels,
   onTestModel,
@@ -286,6 +287,7 @@ export function ModelProviderSectionDetail({
     enabled: boolean,
   ) => Promise<unknown>;
   onDeletePersonalModel?: (providerId: string, modelId: string) => Promise<unknown>;
+  onDetachCatalogModel?: (providerId: string, modelId: string) => Promise<void>;
   onDelete: (provider: ProviderSettingsFormProvider) => Promise<void>;
   onReorderProviderModels?: (providerId: string, modelIds: string[]) => Promise<void>;
   onTestModel: (providerId: string, modelId: string) => Promise<ModelConnectivityResult>;
@@ -324,6 +326,7 @@ export function ModelProviderSectionDetail({
     onSavePersonalModelDraft,
     onSetPersonalModelEnabled,
     onDeletePersonalModel,
+    onDetachCatalogModel,
     settingsRevision: providerSettingsView?.revision,
   };
   const selectedPlanAccess = useMemo(() => {

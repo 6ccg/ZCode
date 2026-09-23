@@ -13,6 +13,7 @@ interface ModelProviderSectionLayoutProps {
   customLoading: boolean;
   onRefresh: () => void;
   addProviderLabel: string;
+  auxiliaryControl?: ReactNode;
   onAddProvider: () => void;
   navigationGroups: ModelProviderNavGroup[];
   selectedNodeKey: string | null;
@@ -37,6 +38,7 @@ export function ModelProviderSectionLayout({
   customLoading,
   onRefresh,
   addProviderLabel,
+  auxiliaryControl,
   onAddProvider,
   navigationGroups,
   selectedNodeKey,
@@ -63,6 +65,7 @@ export function ModelProviderSectionLayout({
           newTestId={TID_MODEL_PROVIDER_ADD_PROVIDER_BUTTON}
         />
       </div>
+      {auxiliaryControl}
 
       <div className="overflow-clip rounded-xl border border-border bg-card">
         <div
