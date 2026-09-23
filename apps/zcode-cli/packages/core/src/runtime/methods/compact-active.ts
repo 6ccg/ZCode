@@ -284,6 +284,9 @@ async function compactActiveConversationImpl(
     );
     if (compactCandidates.length > COMPACT_TOOL_KEEP_MAX_COUNT) compactCandidates = [];
   }
+  const promptOverrides =
+    (await this.builtinPromptSource?.readOverrides()) ?? this.config.builtinPromptOverrides;
+  const compactPrompt = buildCompactPrompt(customInstructions, promptOverrides);
 
   while (true) {
     try {
@@ -294,7 +297,6 @@ async function compactActiveConversationImpl(
           querySource: "compact",
         },
       });
-      const compactPrompt = buildCompactPrompt(customInstructions);
       let result: RuntimeModelTextResult;
       let compactPromptTooLongAttempts = 0;
       let stripMediaForSummary = false;

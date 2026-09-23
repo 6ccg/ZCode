@@ -61,6 +61,7 @@ import {
 } from "../../subagent/computer-use-policy.js";
 import { computeOfficialCuaServerNames } from "./mcp.js";
 import { persistRuntimeModelSelection, sameModelSelection } from "./turn-model.js";
+import { buildGeneralPurposeSystemPrompt } from "../../subagent/general-purpose.js";
 import { getOffPeakExecution, markTemporaryRuntimeSelection } from "../off-peak/runtime.js";
 import { getOffPeakModelBinding } from "../off-peak/model-binding.js";
 
@@ -151,8 +152,15 @@ export function createDefaultSubagentPort(
         };
         const baseAgentPrompt =
           builtInExplore && request.systemPrompt?.trim() === ""
-            ? buildExploreAgentPrompt({ embeddedSearchEnabled })
-            : request.systemPrompt?.trim();
+            ? buildExploreAgentPrompt({
+                embeddedSearchEnabled,
+                builtinPromptOverrides: this.config.builtinPromptOverrides,
+              })
+            : request.profile.source === "built-in" &&
+                request.profile.name === "general-purpose" &&
+                request.systemPrompt?.trim() === buildGeneralPurposeSystemPrompt().trim()
+              ? buildGeneralPurposeSystemPrompt(this.config.builtinPromptOverrides)
+              : request.systemPrompt?.trim();
         const persistentMemory = await loadPersistentAgentMemory({
           fileSystemPort: deps.fileSystemPort,
           logger: this.logger,
@@ -283,6 +291,7 @@ export function createDefaultSubagentPort(
             modelSelection: cloneModelSelection(childSelection),
             modelContextBudgetStrategy: this.config.modelContextBudgetStrategy,
             workingDirectory: request.workingDirectory,
+            builtinPromptOverrides: this.config.builtinPromptOverrides,
             // 执行模型只由 child Active Model 投影进 Context；envInfo 不保存第二份模型事实。
             envInfo: childRuntimeEnvInfo,
             // Explore 子运行时之前没有继承主会话的流式配置，Protocol 桌面端虽已默认
@@ -335,6 +344,7 @@ export function createDefaultSubagentPort(
             // 可能晚于父 Tool/Turn 结束，只能作为独立 Trace 用 Link 保留因果关系。
             agentTelemetryCausationMode: request.background ? "linked_root" : "child",
             eventStore: this.eventStore,
+            builtinPromptSource: this.builtinPromptSource,
             sessionStore: deps.sessionStore,
             // 子 runtime 继承父的模型请求准入端口：subagent 的请求 provider 同样看得见，
             // 它们该与父一样喂治理器信号（父是 observer 则子也是 observer）。

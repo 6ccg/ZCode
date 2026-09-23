@@ -791,6 +791,9 @@ export function createHomeOnlyWebRemoteControlServices(): RootServices {
       locale: resolveWebRemoteControlScreenLocale(navigator.language),
     }),
     update: async () => {},
+    // 未连接 Host 时没有提示词存储，不能把首页占位服务当作设置写入者。
+    getBuiltinPrompts: async () => ({}),
+    setBuiltinPrompt: unsupported("settingService.setBuiltinPrompt"),
     updateDataBaseDir: async () => {},
   };
 

@@ -13,6 +13,7 @@ import type {
 } from "@zcode/contracts";
 import type { AutoCompactPolicyConfig } from "../compact/index.js";
 import type { AgentProfile } from "../subagent/profile.js";
+import type { BuiltinPromptOverrides } from "@zcode/shared/builtin-prompts";
 
 export type {
   EnvInfo,
@@ -100,6 +101,7 @@ export interface OutputStylePromptConfig {
 // -----------------------------------------------
 
 export interface ContextBuilderConfig {
+  builtinPromptOverrides?: BuiltinPromptOverrides;
   workingDirectory: string;
   additionalDirectories?: readonly string[];
   envInfo: EnvInfo;

@@ -9,6 +9,7 @@ export type SettingsSectionId =
   | "modelProvider"
   | "remoteDevices"
   | "memory"
+  | "builtinPrompts"
   | "plugin"
   | "mcp"
   | "skill"
@@ -72,6 +73,7 @@ function isSettingsSectionId(value: string): value is SettingsSectionId {
     value === "modelProvider" ||
     value === "remoteDevices" ||
     value === "memory" ||
+    value === "builtinPrompts" ||
     value === "plugin" ||
     value === "mcp" ||
     value === "skill" ||

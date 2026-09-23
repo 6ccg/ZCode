@@ -137,6 +137,9 @@ async function executeProjectMemoryExtraction(
       const prompt = buildMemoryExtractionPrompt({
         manifest,
         messageCount: input.messageCount,
+        builtinPromptOverrides:
+          (await runtime.builtinPromptSource?.readOverrides()) ??
+          runtime.config.builtinPromptOverrides,
       });
       const request = prepareProjectMemoryAgentRequest(input.snapshot, prompt);
       const executor = createProjectMemoryAgentToolExecutor(runtime, input.snapshot);
