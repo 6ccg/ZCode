@@ -1,4 +1,5 @@
 import { PermissionService, ToolScheduler } from "./deps.js";
+import type { BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 import type {
   Logger,
   ModelSelection,
@@ -94,6 +95,7 @@ export interface AgentRuntimeInternal
   memoryIndexContent?: string;
   memoryExtractionScheduler?: ProjectMemoryExtractionScheduler;
   contextSourcePort?: ContextSourcePort;
+  builtinPromptSource?: BuiltinPromptSource;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
   mcpStartupPromise?: Promise<McpConnectionSnapshot>;

@@ -2297,6 +2297,11 @@ export function createLocalServices(options: {
     cuaProductMcpServerResolver,
   });
   const gitCommitMessageGenerator = new GitCommitMessageGenerator({
+    builtinPromptSource: {
+      async readOverrides() {
+        return settingService.getBuiltinPrompts();
+      },
+    },
     currentModelProvider: {
       async readCurrentModel() {
         // Git sidecar 属于目标 Environment；初始模型直接读取同一 Host View，

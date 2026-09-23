@@ -2,6 +2,7 @@ import type { MessageId, MessageWithParts, ToolPart } from "@zcode/contracts";
 import { resolveContainedMemoryFilePath } from "./memory-file-path.js";
 import { formatMemoryManifest } from "./recall/manifest.js";
 import type { MemoryManifestEntry } from "./recall/types.js";
+import { renderBuiltinPrompt, type BuiltinPromptOverrides } from "@zcode/shared/builtin-prompts";
 
 const MINIMUM_USER_WORDS = 3;
 
@@ -40,6 +41,7 @@ export interface MemoryExtractionScheduler<
 }
 
 export function buildMemoryExtractionPrompt(input: {
+  builtinPromptOverrides?: BuiltinPromptOverrides;
   manifest: readonly MemoryManifestEntry[];
   messageCount: number;
 }): string {
@@ -48,21 +50,10 @@ export function buildMemoryExtractionPrompt(input: {
       ? `\n\n## Existing memory files\n\n${formatMemoryManifest(input.manifest)}\n\nCheck this list before writing \u2014 update an existing file rather than creating a duplicate.`
       : "";
 
-  return [
-    `You are now acting as the memory extraction subagent. Analyze the most recent ~${input.messageCount} messages above and use them to update your persistent memory systems.`,
-    "",
-    "Available tools: Read, Grep, Glob, read-only Bash (ls/find/cat/stat/wc/head/tail and similar), and Edit/Write for paths inside the memory directory only, and Bash rm with paths inside the memory directory only. All other tools \u2014 MCP, Agent, write-capable Bash, etc \u2014 will be denied.",
-    "",
-    "You have a limited turn budget. Edit requires a prior Read of the same file, so the efficient strategy is: turn 1 \u2014 issue all Read calls in parallel for every file you might update; turn 2 \u2014 issue all Write/Edit calls in parallel. Do not interleave reads and writes across multiple turns.",
-    "",
-    `You MUST only use content from the last ~${input.messageCount} messages to update your persistent memories. Do not waste any turns attempting to investigate or verify that content further \u2014 no grepping source files, no reading code to confirm a pattern exists, no git commands.${existingMemories}`,
-    "",
-    "If nothing is worth saving, output only 'Nothing to save.' Do not explain why.",
-    "",
-    "If the user explicitly asks you to remember something, save it immediately as whichever type fits best. If they ask you to forget something, find and remove the relevant entry.",
-    "",
-    "Apply the memory types, what-not-to-save criteria, and frontmatter format from the Memory section of your system prompt \u2014 it is already in your context above.",
-  ].join("\n");
+  return renderBuiltinPrompt("auxiliary.memoryExtraction", input.builtinPromptOverrides, {
+    message_count: String(input.messageCount),
+    existing_memories: existingMemories,
+  });
 }
 
 function evaluateMemoryExtraction(

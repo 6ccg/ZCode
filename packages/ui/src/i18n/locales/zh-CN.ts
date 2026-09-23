@@ -1,5 +1,47 @@
 /** 中文翻译 */
 const zhCN: Record<string, string> = {
+  "settings.builtinPrompts.title": "内置提示词",
+  "settings.builtinPrompts.scope":
+    "作用于当前应用主机：桌面版的本机，或 Web 连接的服务器。切换远程工作区不会修改远端的提示词。",
+  "settings.builtinPrompts.activation":
+    "主会话及其子 Agent 在新建会话或重建运行实例后使用新设置；辅助提示词在下次调用时生效。正在执行的请求保持不变。",
+  "settings.builtinPrompts.group.main": "主 Agent",
+  "settings.builtinPrompts.group.subagent": "内置子 Agent",
+  "settings.builtinPrompts.group.auxiliary": "辅助功能",
+  "settings.builtinPrompts.modified": "已修改",
+  "settings.builtinPrompts.default": "默认",
+  "settings.builtinPrompts.editor": "提示词正文",
+  "settings.builtinPrompts.viewDefault": "查看当前版本默认",
+  "settings.builtinPrompts.backToEdit": "返回编辑",
+  "settings.builtinPrompts.variables": "以下变量由运行时填入，请保留：",
+  "settings.builtinPrompts.variable.identity_intro": "根据 Output Style 生成的身份开场",
+  "settings.builtinPrompts.variable.memory_root": "当前会话的记忆目录",
+  "settings.builtinPrompts.variable.search_guidelines": "根据实际搜索工具生成的指导",
+  "settings.builtinPrompts.variable.bash_read_only_commands": "当前搜索模式的只读命令示例",
+  "settings.builtinPrompts.variable.custom_instructions": "用户本次压缩附加的说明，没有时为空",
+  "settings.builtinPrompts.variable.message_count": "本次提取的消息数量",
+  "settings.builtinPrompts.variable.existing_memories": "已有记忆文件列表，没有时为空",
+  "settings.builtinPrompts.guidanceHint":
+    "仅在 Skill 工具可用且存在技能时注入，修改不会改变触发条件。",
+  "settings.builtinPrompts.format.title":
+    "会话标题与目标标题共用此模板。预期输出为含 title 字符串字段的 JSON。",
+  "settings.builtinPrompts.format.gitCommit":
+    "首行须为 Conventional Commit 格式。分支、文件和差异内容仍自动附加。",
+  "settings.builtinPrompts.format.compact":
+    "保留摘要结构要求：输出 analysis 与 summary 标签。历史对话仍由运行时提供。",
+  "settings.builtinPrompts.save": "保存",
+  "settings.builtinPrompts.saving": "保存中…",
+  "settings.builtinPrompts.saved": "提示词已保存",
+  "settings.builtinPrompts.saveError": "保存失败：{error}",
+  "settings.builtinPrompts.discard": "放弃修改",
+  "settings.builtinPrompts.restore": "恢复默认",
+  "settings.builtinPrompts.restoreDescription":
+    "删除该条的自定义覆盖并使用当前版本默认内容，尚未保存的修改也将丢弃。",
+  "settings.builtinPrompts.unsaved": "有未保存的修改",
+  "settings.builtinPrompts.unsavedTitle": "放弃未保存的修改？",
+  "settings.builtinPrompts.unsavedDescription": "当前提示词尚未保存，离开将丢弃草稿。",
+  "settings.builtinPrompts.loading": "正在读取提示词设置…",
+  "settings.builtinPrompts.retry": "重试",
   "startPlan.recommendation.subagentDescription":
     "你的体验套餐中，{model} 仍有可用额度，是否将此子智能体的模型切换到体验套餐？",
   "startPlan.recommendation.preferenceSaveFailed": "未能保存“不再提示”，本次仍按你的选择继续。",
