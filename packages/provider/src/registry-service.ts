@@ -228,6 +228,7 @@ export class ProviderRegistryService {
           accountProviders: account.providers,
           accountStates: account.states,
           personalProviderOrder: config.personalProviderOrder,
+          modelCatalogs: config.modelCatalogs,
         });
         this.#registry.replace(resolution.registryProviders, [...reasons].join(","));
         const snapshot = Object.freeze({

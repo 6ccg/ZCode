@@ -89,7 +89,7 @@ test("startup migrates published ZCode config into personal config without chang
     );
     assert.equal(await readFile(fixture.legacyPath, "utf8"), fixture.legacyContent);
     const persisted = JSON.parse(await readFile(fixture.personalPath, "utf8"));
-    assert.equal(persisted.schemaVersion, 1);
+    assert.equal(persisted.schemaVersion, 2);
     assert.equal(
       persisted.config.providerConfigRules.providerRules[0].providerId,
       "custom-example",
@@ -115,7 +115,9 @@ test("startup preserves an existing personal config and never consults the legac
     assert.deepEqual(fixture.recoveries, []);
     assert.equal(fixture.readCount(), 0);
     assert.deepEqual(config.personalProviders.toJSON(), []);
-    assert.equal(await readFile(fixture.personalPath, "utf8"), current);
+    const migrated = JSON.parse(await readFile(fixture.personalPath, "utf8"));
+    assert.equal(migrated.schemaVersion, 2);
+    assert.deepEqual(migrated.config, { ...JSON.parse(current).config, modelCatalogs: {} });
   } finally {
     await fixture.dispose();
   }

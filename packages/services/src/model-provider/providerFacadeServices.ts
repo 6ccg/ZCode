@@ -34,6 +34,8 @@ export interface IProviderSettingsService {
   createPersonalProvider(
     input?: Parameters<ProviderSettingsFacade["createPersonalProvider"]>[0],
   ): Promise<ProviderSettingsCreationResult>;
+  refreshModelCatalog(providerId: ProviderId): Promise<ProviderSettingsView>;
+  detachCatalogModel(providerId: ProviderId, modelId: ModelId): Promise<ProviderSettingsView>;
   resolveModelConfig(input: ResolveModelConfigInput): Promise<ModelConfigResolution>;
   savePersonalProviderOverlay(
     providerId: ProviderId,
@@ -124,6 +126,14 @@ export function createProviderSettingsService(
     createPersonalProvider: async (input) => {
       await ensureReady();
       return facade.createPersonalProvider(input);
+    },
+    refreshModelCatalog: async (providerId) => {
+      await ensureReady();
+      return facade.refreshModelCatalog(providerId);
+    },
+    detachCatalogModel: async (providerId, modelId) => {
+      await ensureReady();
+      return facade.detachCatalogModel(providerId, modelId);
     },
     resolveModelConfig: async (input) => {
       await ensureReady();

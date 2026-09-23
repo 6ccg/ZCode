@@ -27,12 +27,14 @@ export function ProviderTemplatePicker({
   onBack,
   onCreateFromTemplate,
   onCreateCustom,
+  onCreateModelLink,
   creating,
 }: {
   templates: ProviderSettingsView["providerTemplates"];
   onBack: () => void;
   onCreateFromTemplate: ProviderTemplateCreate;
   onCreateCustom: CustomProviderCreate;
+  onCreateModelLink?: (protocol: "chat" | "responses") => Promise<void>;
   creating: boolean;
 }) {
   const { intl, locale } = useZCodeIntl();
@@ -115,6 +117,18 @@ export function ProviderTemplatePicker({
                   onClick={() => void createWithFeedback(() => onCreateCustom(customLabel))}
                 />
               ) : null}
+              {group.id === "other" && onCreateModelLink
+                ? (["chat", "responses"] as const).map((protocol) => (
+                    <ProviderTemplateCard
+                      key={`modellink-${protocol}`}
+                      label={protocol === "chat" ? "ModelLink Chat" : "ModelLink Responses"}
+                      disabled={creating}
+                      testId={testId(TID_MODEL_PROVIDER_TEMPLATE_ITEM, `modellink-${protocol}`)}
+                      icon={<PlusIcon className="size-4" aria-hidden="true" />}
+                      onClick={() => void createWithFeedback(() => onCreateModelLink(protocol))}
+                    />
+                  ))
+                : null}
               {group.templates.map((template) => {
                 const label = resolveProviderTemplateName(template.templateId, template, locale);
                 return (

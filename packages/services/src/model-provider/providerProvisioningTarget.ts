@@ -173,7 +173,7 @@ interface AppliedProvisioningState {
 
 function parsePersonalConfig(envelope: ProviderProvisioningEnvelope): ProviderConfigLayerUpdate {
   // 信封与本地保存复用正式 Personal codec，不在接收端另建字段清单或模式判断。
-  return decodeProviderConfigFile({ schemaVersion: 1, config: envelope.personalConfig });
+  return decodeProviderConfigFile({ schemaVersion: 2, config: envelope.personalConfig });
 }
 
 async function captureBeforeState(

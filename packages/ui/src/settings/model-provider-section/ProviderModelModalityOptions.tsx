@@ -65,11 +65,13 @@ function ModalityOption({
 }
 
 export function ProviderModelInputModalityOptions({
+  restrictedMedia = false,
   value,
   onChange,
   personalValue,
   overrideFields,
 }: {
+  restrictedMedia?: boolean;
   value: ProviderModelInputFormatDraft;
   onChange: (value: ProviderModelInputFormatDraft) => void;
   personalValue?: ProviderModelInputFormatOverlay | null;
@@ -83,7 +85,9 @@ export function ProviderModelInputModalityOptions({
   };
   return (
     <div className="flex flex-wrap gap-2">
-      {INPUT_MODALITY_OPTIONS.map((modality) => {
+      {INPUT_MODALITY_OPTIONS.filter(
+        (modality) => !restrictedMedia || modality === "text" || modality === "image",
+      ).map((modality) => {
         const disabled = modality === "text";
         const field = disabled ? "supportsText" : INPUT_MODALITY_FIELDS[modality];
         const overridden =

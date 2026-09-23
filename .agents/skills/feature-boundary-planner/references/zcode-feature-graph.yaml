@@ -25,6 +25,19 @@ rules:
     - invariant-only
     - evidence-only
 nodes:
+  - id: capability.modellink-catalog
+    kind: capability
+    label: ModelLink protocol channels and imported model capabilities
+    aliases: [ModelLink, ModelLink Chat, ModelLink Responses, 模型目录, 获取模型]
+    codeSeeds:
+      - file: packages/provider-node/src/modellink-catalog-loader.ts
+        symbol: loadModelLinkCatalog
+      - file: packages/provider/src/model-catalog.ts
+        symbol: resolveCatalogModelConfig
+      - file: packages/provider/src/config-service.ts
+        symbol: ProviderConfigService
+    invariants:
+      - "Connection URL and API key come from personal provider settings; catalog refresh cannot overwrite personal model rules."
   - id: capability.model-selection
     kind: capability
     label: Model selection
@@ -356,6 +369,10 @@ nodes:
       - file: apps/zcode-cli/packages/core/src/runtime/methods/turn-model.ts
         symbol: applySubmissionExecutionState
 edges:
+  - from: capability.modellink-catalog
+    to: service.host-model-selection
+    type: options-from
+    rank: must-inspect
   - from: capability.model-selection
     to: surface.conversation-model-control
     type: renders-in
