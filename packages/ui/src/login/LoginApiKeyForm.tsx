@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ZHIPU_OFFICIAL_PLANS_ENABLED } from "@/lib/officialPlanAvailability.js";
 import { isApiKeyAccess } from "@zcode/provider";
 import { Loader2Icon, TriangleAlertIcon } from "lucide-react";
 import {
@@ -69,9 +70,11 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
   )?.config.access;
   const apiKeyUrl = isApiKeyAccess(templateAccess) ? templateAccess.apiKeyManagementUrl : undefined;
   // 用户已经输入或回填 API Key 后，右侧获取入口会挤占密码输入区域。
-  const showApiKeyLink = shouldShowLoginApiKeyLink(apiKeyValue, apiKeyUrl ?? undefined);
+  const showApiKeyLink =
+    ZHIPU_OFFICIAL_PLANS_ENABLED && shouldShowLoginApiKeyLink(apiKeyValue, apiKeyUrl ?? undefined);
 
   const saveApiKeyProvider = async () => {
+    if (!ZHIPU_OFFICIAL_PLANS_ENABLED) return;
     const apiKey = apiKeyValue.trim();
     if (!apiKey) {
       setError(intl.formatMessage({ id: "login.apiKey.emptyError" }));
@@ -161,7 +164,7 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
             <Select
               value={providerChoice}
               onValueChange={(value) => setProviderChoice(value as ApiKeyProviderChoice)}
-              disabled={busy}
+              disabled={busy || !ZHIPU_OFFICIAL_PLANS_ENABLED}
             >
               <SelectTrigger
                 id="login-api-key-provider"
@@ -211,6 +214,7 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
                 id: "login.apiKey.placeholder",
               })}
               autoComplete="off"
+              disabled={!ZHIPU_OFFICIAL_PLANS_ENABLED}
               onChange={(event) => {
                 setApiKeyValue(event.target.value);
                 setError(null);
@@ -239,6 +243,13 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
         </div>
       </div>
 
+      {!ZHIPU_OFFICIAL_PLANS_ENABLED ? (
+        <Alert>
+          <AlertDescription>
+            {intl.formatMessage({ id: "settings.modelProvider.officialPlansDisabled" })}
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {error ? (
         <Alert variant="destructive" data-testid={TID_LOGIN_API_KEY_ERROR}>
           <TriangleAlertIcon className="size-4" />
@@ -252,7 +263,7 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
           className="h-10 w-full text-ui-base"
           size="lg"
           data-testid={TID_LOGIN_API_KEY_CONTINUE_BUTTON}
-          disabled={!apiKeyValue.trim() || busy}
+          disabled={!ZHIPU_OFFICIAL_PLANS_ENABLED || !apiKeyValue.trim() || busy}
           onClick={() => void saveApiKeyProvider()}
         >
           {saving ? <Loader2Icon className="size-4 animate-spin" /> : null}

@@ -19,6 +19,7 @@ import {
 } from "@/hooks/useCodingPlanEntryPlanList.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
 import { reportCodingPlanUpgradeClick } from "@/lib/codingPlanFunnelTelemetry.js";
+import { ZHIPU_OFFICIAL_PLANS_ENABLED } from "@/lib/officialPlanAvailability.js";
 
 interface CodingPlanUpgradeDialogContextValue {
   inventory: CodingPlanEntryInventory;
@@ -48,6 +49,7 @@ export function CodingPlanUpgradeDialogProvider({ children }: { children: ReactN
       observation?: { signal: AbortSignal; onResult: (opened: boolean) => void },
     ) => {
       // 所有入口统一守卫；查询完成后不自动重放之前被拦截的点击。
+      if (!ZHIPU_OFFICIAL_PLANS_ENABLED) return false;
       const { status, entryPlanList } = inventoryRef.current;
       if (observation?.signal.aborted) return false;
       if (status !== "ready") {

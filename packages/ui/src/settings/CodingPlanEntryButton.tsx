@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { ZHIPU_OFFICIAL_PLANS_ENABLED } from "@/lib/officialPlanAvailability.js";
 import { Button } from "@/components/ui/button.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useOptionalCodingPlanUpgradeDialog } from "@/settings/CodingPlanUpgradeDialogProvider.js";
@@ -29,7 +30,7 @@ export function CodingPlanEntryButton({
   return (
     <Button
       {...props}
-      disabled={disabled || status === "loading"}
+      disabled={!ZHIPU_OFFICIAL_PLANS_ENABLED || disabled || status === "loading"}
       aria-label={status === "ready" ? props["aria-label"] : gate.label}
       aria-busy={status === "loading"}
       title={status === "ready" ? props.title : gate.label}
