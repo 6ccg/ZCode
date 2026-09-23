@@ -2,6 +2,7 @@ import type { ToolSearchExecutionContext, ToolSearchMode } from "@zcode/contract
 import type { RequestVerificationReason } from "@zcode/shared";
 import type { GetAgentDefinitions, LoadAgentDefinitions } from "../subagent/definitions.js";
 import type { RuntimeInputPresentation, TurnExecutionModelFallbackReason } from "@zcode/contracts";
+import type { BuiltinPromptOverrides, BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 /* eslint-disable max-lines -- Runtime 类型集中承载 core/runtime 对外结构，拆分需要单独迁移。 */
 import { PermissionService, ToolScheduler } from "./deps.js";
 import type {
@@ -122,6 +123,7 @@ import type { WorkspaceHookRuntimeAdmissionPort } from "../hooks/workspace-hook-
 
 export interface AgentRuntimeConfig {
   toolSearch?: { mode?: ToolSearchMode };
+  builtinPromptOverrides?: BuiltinPromptOverrides;
   /** shared-host CUA request routing metadata; desktop is the safe default. */
   clientMode?: "desktop-continuous" | "web-remote-replayable";
   deliveryKind?: "desktop-continuous" | "web-remote-replayable";
@@ -404,6 +406,7 @@ export interface AgentRuntimeDeps {
   offPeakPort?: OffPeakPort;
   topicResourcePort?: TopicResourcePort;
   contextSourcePort?: ContextSourcePort;
+  builtinPromptSource?: BuiltinPromptSource;
   eventSink?: SessionEventSink;
   logger?: Logger;
   traceContext?: TraceContext;

@@ -62,6 +62,7 @@ import {
 } from "../../subagent/computer-use-policy.js";
 import { computeOfficialCuaServerNames } from "./mcp.js";
 import { persistRuntimeModelSelection, sameModelSelection } from "./turn-model.js";
+import { buildGeneralPurposeSystemPrompt } from "../../subagent/general-purpose.js";
 import { getOffPeakExecution, markTemporaryRuntimeSelection } from "../off-peak/runtime.js";
 import { getOffPeakModelBinding } from "../off-peak/model-binding.js";
 
@@ -166,8 +167,15 @@ export function createDefaultSubagentPort(
         };
         const baseAgentPrompt =
           builtInExplore && request.systemPrompt?.trim() === ""
-            ? buildExploreAgentPrompt({ embeddedSearchEnabled })
-            : request.systemPrompt?.trim();
+            ? buildExploreAgentPrompt({
+                embeddedSearchEnabled,
+                builtinPromptOverrides: this.config.builtinPromptOverrides,
+              })
+            : request.profile.source === "built-in" &&
+                request.profile.name === "general-purpose" &&
+                request.systemPrompt?.trim() === buildGeneralPurposeSystemPrompt().trim()
+              ? buildGeneralPurposeSystemPrompt(this.config.builtinPromptOverrides)
+              : request.systemPrompt?.trim();
         const persistentMemory = await loadPersistentAgentMemory({
           fileSystemPort: deps.fileSystemPort,
           logger: this.logger,
@@ -310,6 +318,7 @@ export function createDefaultSubagentPort(
             modelSelection: cloneModelSelection(childSelection),
             modelContextBudgetStrategy: this.config.modelContextBudgetStrategy,
             workingDirectory: request.workingDirectory,
+            builtinPromptOverrides: this.config.builtinPromptOverrides,
             // 执行模型只由 child Active Model 投影进 Context；envInfo 不保存第二份模型事实。
             envInfo: childRuntimeEnvInfo,
             // Explore 子运行时之前没有继承主会话的流式配置，Protocol 桌面端虽已默认
@@ -364,6 +373,7 @@ export function createDefaultSubagentPort(
             eventStore: this.eventStore,
             // 日期公告取运行时时钟；child 继承父时钟，父子只有一个日期来源。
             now: this.now,
+            builtinPromptSource: this.builtinPromptSource,
             sessionStore: deps.sessionStore,
             // 共享宿主环境读取端口，只用于 child 内 cd 之后的环境探测；初始快照和指令都取父级传下的配置。
             contextSourcePort: this.contextSourcePort,
