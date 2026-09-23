@@ -21,6 +21,7 @@ import {
 } from "./config/index.js";
 import { resolveOwnedOrder } from "./owned-order.js";
 import type { AccountProviderStates } from "./account-provider-state.js";
+import { resolveCatalogModelConfig, type ModelCatalogs } from "./model-catalog.js";
 
 export type RegistryZhipuAccountAccessConfig = ZhipuAccountAccessConfig &
   z.infer<typeof completeZhipuAccountAccessDataSchema>;
@@ -126,6 +127,7 @@ export function createRegistryModelConfig(
 }
 
 export interface ProviderConfigResolverInput {
+  readonly modelCatalogs?: ModelCatalogs;
   readonly zcodeBuiltinProviders: ProviderConfigMap;
   readonly zcodeBuiltinProviderTemplates?: ProviderTemplateMap;
   readonly personalProviders: ProviderConfigMap;
@@ -206,10 +208,6 @@ export class ProviderConfigResolver {
       return template ? template.overlay(personal) : personal;
     });
     const effectiveProviders = effectiveBuiltinProviders.overlay(templatePersonalProviders);
-    const effectiveModelRules = ModelConfigRules.composeEffective(
-      input.zcodeBuiltinModelRules,
-      input.personalModels,
-    );
     const issues: ConfigValidationIssue[] = [];
     const resolvedProviders: ResolvedProvider[] = [];
     const registryProviders: Provider[] = [];
@@ -234,7 +232,11 @@ export class ProviderConfigResolver {
         });
       }
       issues.push(...providerIssues);
-      const builtinModelIds = config.builtinModelIds ?? [];
+      const catalog = input.modelCatalogs?.[providerId];
+      const builtinModelIds = [
+        ...(config.builtinModelIds ?? []),
+        ...(catalog?.models.map((model) => model.modelId) ?? []),
+      ];
       const personalModelIds = config.personalModelIds ?? [];
       const builtinIdsInOrder = uniqueInOrder(builtinModelIds);
       const builtinIds = new Set(builtinIdsInOrder);
@@ -254,26 +256,34 @@ export class ProviderConfigResolver {
       const providerExecutable =
         enabled && accessEntitled && accountCurrent && providerIssues.length === 0;
       const models = orderedModelIds.map((modelId): ResolvedProviderModel => {
-        const modelConfig = effectiveModelRules.resolve({
-          providerId,
-          templateId,
-          modelId,
-          apiType: config.api?.type,
-          baseUrl: config.api?.baseUrl,
-        });
-        const effectiveBuiltinConfig = input.zcodeBuiltinModelRules.resolve({
-          providerId,
-          templateId,
-          modelId,
-          apiType: config.api?.type,
-          baseUrl: config.api?.baseUrl,
-        });
+        const { effective: modelConfig, inherited: effectiveBuiltinConfig } =
+          resolveCatalogModelConfig({
+            identity: {
+              providerId,
+              templateId,
+              modelId,
+              apiType: config.api?.type,
+              baseUrl: config.api?.baseUrl,
+            },
+            builtin: input.zcodeBuiltinModelRules,
+            personal: input.personalModels,
+            catalogs: input.modelCatalogs,
+          });
         const registryModelResult = createRegistryModelConfig(modelConfig, [
           ...providerPath,
           "models",
           modelId,
         ]);
-        const modelIssues = registryModelResult.ok ? [] : registryModelResult.issues;
+        const modelIssues: ConfigValidationIssue[] = registryModelResult.ok
+          ? []
+          : [...registryModelResult.issues];
+        const catalogEntry = catalog?.models.find((model) => model.modelId === modelId);
+        if (catalogEntry && (!catalogEntry.available || !catalog?.fetchedAt))
+          modelIssues.push({
+            code: "invalid-config",
+            path: [...providerPath, "models", modelId],
+            message: "模型目录不可用或模型已下架，请重新获取目录",
+          });
         issues.push(...modelIssues);
         const modelEnabled = modelConfig.enabled === true;
         const executable = providerExecutable && modelEnabled && modelIssues.length === 0;

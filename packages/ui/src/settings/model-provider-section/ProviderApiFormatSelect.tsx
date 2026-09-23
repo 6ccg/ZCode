@@ -50,16 +50,22 @@ export function ProviderApiFormatSelect({
   triggerId,
   value,
   onChange,
+  disabled,
 }: {
   apiFormatOptions?: readonly ProviderApiType[];
   triggerId?: string;
   value: ProviderApiType;
   onChange: (value: ProviderApiType) => void;
+  disabled?: boolean;
 }) {
   const { intl } = useZCodeIntl();
 
   return (
-    <Select value={value} onValueChange={(nextValue) => onChange(nextValue as ProviderApiType)}>
+    <Select
+      disabled={disabled}
+      value={value}
+      onValueChange={(nextValue) => onChange(nextValue as ProviderApiType)}
+    >
       <SelectTrigger
         id={triggerId}
         data-testid={TID_MODEL_PROVIDER_API_FORMAT_TRIGGER}

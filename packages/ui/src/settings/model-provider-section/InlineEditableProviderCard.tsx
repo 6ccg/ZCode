@@ -144,6 +144,7 @@ export function InlineEditableProviderCard({
   onSavePersonalModelDraft,
   onSetPersonalModelEnabled,
   onDeletePersonalModel,
+  onDetachCatalogModel,
   onDelete,
   onTestModel,
   onReorderModelIds,
@@ -171,6 +172,7 @@ export function InlineEditableProviderCard({
     enabled: boolean,
   ) => Promise<unknown>;
   onDeletePersonalModel?: (providerId: string, modelId: string) => Promise<unknown>;
+  onDetachCatalogModel?: (providerId: string, modelId: string) => Promise<void>;
   onDelete?: () => void | Promise<void>;
   onTestModel?: (providerId: string, modelId: string) => Promise<ModelConnectivityResult>;
   onReorderModelIds?: (modelIds: string[]) => Promise<void>;
@@ -842,6 +844,12 @@ export function InlineEditableProviderCard({
         ) : null}
 
         <ProviderModelsSection
+          restrictedMedia={Boolean(provider.catalog)}
+          onDetachCatalogModel={
+            provider.catalog && onDetachCatalogModel
+              ? (modelId) => onDetachCatalogModel(provider.providerId, modelId)
+              : undefined
+          }
           // 不同 Provider 可以有同名模型；不能复用上一供应商的打开中草稿和版本。
           key={provider.providerId}
           providerId={provider.providerId}
