@@ -38,6 +38,7 @@
 5. 不直接复用 `customSystemPrompt`：当前 `ContextBuilder.build()` 的该分支会跳过默认身份、桌面、会话指导、记忆和环境等多段内容。此次是在原有分段组装位置替换对应模板，不切换到整段 system prompt 替代路径。
 6. 原有 Output Style、自定义 Agent 和显式 systemPrompt 保留其现有优先级；内置模板覆盖仅影响使用这些内置模板的路径，不强行覆盖用户已选择的自定义模式。
 7. 页面固定绑定 `useBaseWorkspaceServices` 所属应用主机，与本机模型设置一致，并明确标示作用域。Desktop 为本机 Host，Web 为其连接的应用服务器，手机 attachment 复用桌面 Host。激活独立 SSH 工作区不会切换本页的设置源，也不隐式复制设置到远端。
+8. Desktop Agent/SEA 的 esbuild 别名表显式映射 `@zcode/shared/builtin-prompts`，避免 shared 总入口的前缀匹配错误拼接子路径；发布前实际构建 Agent bundle。
 
 ## 生效时机与升级
 

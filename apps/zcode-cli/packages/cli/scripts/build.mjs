@@ -1,5 +1,8 @@
 import { chmod, readFile, rm } from "node:fs/promises";
-import { readThirdPartyNotices, stageThirdPartyNotices } from "../../../../../scripts/third-party-notices.mjs";
+import {
+  readThirdPartyNotices,
+  stageThirdPartyNotices,
+} from "../../../../../scripts/third-party-notices.mjs";
 import { basename, dirname, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { build } from "esbuild";
@@ -197,6 +200,11 @@ export const resolveBuildAliases = ({
     "../../packages/shared/src/zcodeEndpoint.ts",
   ),
   "@zcode/shared/node": resolve(rootDirectory, "../../packages/shared/src/node.ts"),
+  // 提示词子入口必须先精确映射，否则通用 alias 会拼成 index.ts/builtin-prompts。
+  "@zcode/shared/builtin-prompts": resolve(
+    rootDirectory,
+    "../../packages/shared/src/builtin-prompts/index.ts",
+  ),
   "@zcode/shared": resolve(rootDirectory, "../../packages/shared/src/index.ts"),
   "@zcode/core": resolve(cliDirectory, "../core/dist/index.js"),
 });
