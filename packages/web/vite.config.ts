@@ -83,6 +83,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       __ZCODE_ENDPOINT_ENV__: JSON.stringify(pickProductEndpointEnv(env)),
+      __ZCODE_MODELLINK_BASE_URL__: JSON.stringify(env.ZCODE_MODELLINK_BASE_URL ?? ""),
       __ZCODE_VERSION__: JSON.stringify(version),
       __ZCODE_COMMIT__: JSON.stringify(env.ZCODE_COMMIT || "unknown"),
       __ZCODE_ENV__: JSON.stringify(zcodeEnv),

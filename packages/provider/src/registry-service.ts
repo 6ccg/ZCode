@@ -102,6 +102,10 @@ export class ProviderRegistryService {
     return this.#registry.getView();
   }
 
+  getAuxiliaryModelSelection(): ModelSelection | undefined {
+    return this.#snapshot?.config.auxiliaryModelSelection;
+  }
+
   listProviders(): readonly Provider[] {
     return this.#registry.listProviders();
   }
@@ -228,6 +232,7 @@ export class ProviderRegistryService {
           accountProviders: account.providers,
           accountStates: account.states,
           personalProviderOrder: config.personalProviderOrder,
+          modelCatalogs: config.modelCatalogs,
         });
         this.#registry.replace(resolution.registryProviders, [...reasons].join(","));
         const snapshot = Object.freeze({

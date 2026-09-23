@@ -2,7 +2,7 @@ export const ZCODE_BUILTIN_PROVIDER_CONFIG_FILE_ENV = "ZCODE_BUILTIN_PROVIDER_CO
 export const ZCODE_BUILTIN_PROVIDER_BUNDLED_CONFIG_FILE_ENV =
   "ZCODE_BUILTIN_PROVIDER_BUNDLED_CONFIG_FILE";
 export const ZCODE_PERSONAL_PROVIDER_CONFIG_FILE_ENV = "ZCODE_PERSONAL_PROVIDER_CONFIG_FILE";
-export const PERSONAL_PROVIDER_CONFIG_FILE_NAME = "provider_config.json";
+export const PERSONAL_PROVIDER_CONFIG_FILE_NAME = "provider_config.zcode-modified.json";
 
 export interface NodeProviderRuntimePaths {
   readonly zcodeBuiltinFilePath: string;

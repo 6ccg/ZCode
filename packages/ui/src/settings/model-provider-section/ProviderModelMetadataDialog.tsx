@@ -44,6 +44,7 @@ function selectFocusedInputText(event: Pick<FocusEvent<HTMLInputElement>, "curre
 }
 
 export function ProviderModelMetadataDialog({
+  restrictedMedia,
   mode = "edit",
   open,
   draft,
@@ -62,6 +63,7 @@ export function ProviderModelMetadataDialog({
   modelDefaultsLoaded = false,
   onModelIdBlur,
 }: {
+  restrictedMedia?: boolean;
   mode?: "add" | "edit";
   open: boolean;
   draft: ProviderModelDraftValues;
@@ -312,6 +314,7 @@ export function ProviderModelMetadataDialog({
                     <ModelConfigHelp field="inputModalities" />
                   </div>
                   <ProviderModelInputModalityOptions
+                    restrictedMedia={restrictedMedia}
                     value={draft.inputFormatValue}
                     onChange={(inputFormatValue) => onDraftChange({ inputFormatValue })}
                     personalValue={personalConfig?.properties?.inputFormat}

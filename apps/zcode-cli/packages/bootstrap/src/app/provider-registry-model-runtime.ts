@@ -13,6 +13,7 @@ import { createRegistrySelectionProtocolError } from "./provider-registry-select
 export type RuntimeModelFactory = NonNullable<AgentRuntimeDeps["modelFactory"]>;
 
 export interface ProviderRegistryModelSource {
+  getAuxiliaryModelSelection?(): ModelSelection | undefined;
   getView(): ProviderRegistryView;
   getProvider(providerId: string): Provider | undefined;
   getModel(providerId: string, modelId: string): ProviderModel | undefined;

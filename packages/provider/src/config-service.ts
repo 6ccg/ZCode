@@ -19,6 +19,13 @@ import {
 import { resolveOwnedOrder } from "./owned-order.js";
 import type { ModelSelection } from "@zcode/shared/model-selection";
 import type { ProviderConfigSnapshot, ProviderSource } from "./sources.js";
+import {
+  emptyModelLinkCatalog,
+  modelCatalogSchema,
+  resolveCatalogModelConfig,
+  type ModelCatalogs,
+  type ModelCatalogEntry,
+} from "./model-catalog.js";
 
 export interface ProviderConfigLayerSnapshot {
   readonly revision: string;
@@ -27,6 +34,8 @@ export interface ProviderConfigLayerSnapshot {
   readonly models: ModelConfigRules;
   readonly providerOrder?: readonly ProviderId[];
   readonly defaultModelSelection?: ModelSelection;
+  readonly modelCatalogs?: ModelCatalogs;
+  readonly auxiliaryModelSelection?: ModelSelection;
 }
 
 export interface ProviderConfigLayerUpdate {
@@ -35,6 +44,8 @@ export interface ProviderConfigLayerUpdate {
   readonly models: ModelConfigRules;
   readonly providerOrder?: readonly ProviderId[];
   readonly defaultModelSelection?: ModelSelection;
+  readonly modelCatalogs?: ModelCatalogs;
+  readonly auxiliaryModelSelection?: ModelSelection;
 }
 
 export interface PersonalProviderConfigRepository extends ProviderSource<ProviderConfigLayerSnapshot> {
@@ -53,6 +64,7 @@ export interface PersonalProviderCreation {
 }
 
 export interface CreatePersonalProviderInput {
+  readonly catalogSource?: "modellink";
   readonly templateId?: ProviderTemplateId;
   readonly providerName?: string;
   readonly locale?: ProviderTemplateLocale;
@@ -125,6 +137,8 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       zcodeBuiltinModelRules: zcodeBuiltin.models,
       personalModels: personal.models,
       personalProviderOrder: personal.providerOrder ?? [],
+      modelCatalogs: personal.modelCatalogs ?? {},
+      auxiliaryModelSelection: personal.auxiliaryModelSelection,
     });
   }
 
@@ -190,10 +204,18 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
         normalizePersonalProviderMembership(
           currentPersonal,
           membershipBaseline,
-          membership?.inheritedModelIds,
+          membership?.inheritedModelIds ??
+            current.modelCatalogs?.[providerId]?.models.map((model) => model.modelId),
         ),
       );
       const currentRule = current.providers.getRule(providerId);
+      const catalog = current.modelCatalogs?.[providerId];
+      if (catalog && next.api?.type !== currentPersonal?.api?.type)
+        throw new Error("ModelLink 渠道协议固定，请创建另一个协议的渠道");
+      const connectionChanged =
+        catalog &&
+        JSON.stringify([currentPersonal?.api?.toJSON(), currentPersonal?.access?.toJSON()]) !==
+          JSON.stringify([next.api?.toJSON(), next.access?.toJSON()]);
       const providers = current.providers.setRule({
         ...currentRule,
         providerId,
@@ -216,6 +238,16 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
         providers,
         models: current.models,
         providerOrder: current.providerOrder,
+        modelCatalogs: connectionChanged
+          ? {
+              ...current.modelCatalogs,
+              [providerId]: {
+                ...catalog,
+                fetchedAt: null,
+                models: catalog.models.map((model) => ({ ...model, available: false })),
+              },
+            }
+          : current.modelCatalogs,
       };
     });
   }
@@ -233,6 +265,13 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
     if (input.initialConfig?.builtinModelIds !== undefined) {
       throw new Error("initialConfig 不能包含 builtinModelIds");
     }
+    if (
+      input.catalogSource &&
+      !["openai-chat-completions", "openai-responses"].includes(
+        input.initialConfig?.api?.type ?? "",
+      )
+    )
+      throw new Error("ModelLink 渠道必须指定 Chat Completions 或 Responses 协议");
     let createdProviderId: ProviderId | undefined;
     await this.#updatePersonal((current) => {
       const occupied = new Set([...zcodeBuiltin.providers.keys(), ...current.providers.keys()]);
@@ -261,6 +300,9 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       return {
         providers,
         models: current.models,
+        modelCatalogs: input.catalogSource
+          ? { ...current.modelCatalogs, [providerId]: emptyModelLinkCatalog() }
+          : current.modelCatalogs,
         providerOrder: appendCurrentProviderOrder(
           zcodeBuiltin.providers,
           providers,
@@ -279,7 +321,82 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       providers: current.providers.delete(providerId),
       models: current.models.deleteExactForProvider(providerId),
       providerOrder: current.providerOrder?.filter((candidate) => candidate !== providerId),
+      modelCatalogs: Object.fromEntries(
+        Object.entries(current.modelCatalogs ?? {}).filter(([id]) => id !== providerId),
+      ),
     }));
+  }
+
+  saveModelCatalog(
+    providerId: ProviderId,
+    models: readonly ModelCatalogEntry[],
+    expectedRevision: string,
+  ): Promise<ProviderConfigLayerSnapshot> {
+    return this.#updatePersonal((current) => {
+      if (current.revision !== expectedRevision)
+        throw new Error("Model catalog revision conflict，请重新获取目录");
+      const previous = current.modelCatalogs?.[providerId];
+      if (!previous || !current.providers.has(providerId)) throw new Error("ModelLink 渠道不存在");
+      const personalIds = new Set(current.providers.get(providerId)?.personalModelIds ?? []);
+      const imported = models.filter((model) => !personalIds.has(model.modelId));
+      const ids = new Set(imported.map((model) => model.modelId));
+      const catalog = modelCatalogSchema.parse({
+        source: "modellink",
+        fetchedAt: new Date().toISOString(),
+        models: [
+          ...imported,
+          ...previous.models
+            .filter((model) => !ids.has(model.modelId) && !personalIds.has(model.modelId))
+            .map((model) => ({ ...model, available: false })),
+        ],
+      });
+      return { ...current, modelCatalogs: { ...current.modelCatalogs, [providerId]: catalog } };
+    });
+  }
+
+  saveAuxiliaryModelSelection(
+    selection: ModelSelection | undefined,
+  ): Promise<ProviderConfigLayerSnapshot> {
+    return this.#updatePersonal((current) => ({ ...current, auxiliaryModelSelection: selection }));
+  }
+
+  async detachCatalogModel(
+    providerId: ProviderId,
+    modelId: ModelId,
+  ): Promise<ProviderConfigLayerSnapshot> {
+    const builtin = await this.#zcodeBuiltinSource.read();
+    return this.#updatePersonal((current) => {
+      const catalog = current.modelCatalogs?.[providerId];
+      const provider = current.providers.get(providerId);
+      if (!provider || !catalog?.models.some((model) => model.modelId === modelId))
+        throw new Error("目录模型不存在");
+      const { effective } = resolveCatalogModelConfig({
+        identity: {
+          providerId,
+          modelId,
+          apiType: provider.api?.type,
+          baseUrl: provider.api?.baseUrl,
+        },
+        builtin: builtin.models,
+        personal: current.models,
+        catalogs: current.modelCatalogs,
+      });
+      return {
+        ...current,
+        providers: current.providers.set(
+          providerId,
+          provider.withPersonalModelIds([...(provider.personalModelIds ?? []), modelId]),
+        ),
+        models: current.models.setExact(providerId, modelId, effective, true),
+        modelCatalogs: {
+          ...current.modelCatalogs,
+          [providerId]: {
+            ...catalog,
+            models: catalog.models.filter((model) => model.modelId !== modelId),
+          },
+        },
+      };
+    });
   }
 
   async reorderPersonalProviders(
@@ -307,7 +424,10 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
         resolveTemplateBaseline(zcodeBuiltin, current.providers, providerId);
       const provider = writableProviderOverlay(zcodeBuiltin, current, providerId);
       const modelOrder = normalizeModelOrder(
-        membership?.inheritedModelIds ?? builtinProvider?.builtinModelIds ?? [],
+        membership?.inheritedModelIds ?? [
+          ...(builtinProvider?.builtinModelIds ?? []),
+          ...(current.modelCatalogs?.[providerId]?.models.map((model) => model.modelId) ?? []),
+        ],
         provider.personalModelIds ?? [],
         modelIds,
       );
@@ -334,7 +454,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       const provider = writableProviderOverlay(zcodeBuiltin, current, normalizedProviderId);
       const builtinModelIds =
         membership?.inheritedModelIds ??
-        resolveProviderBuiltinModelIds(zcodeBuiltin, current.providers, normalizedProviderId);
+        resolveProviderBuiltinModelIds(zcodeBuiltin, current, normalizedProviderId);
       if (builtinModelIds.includes(normalizedModelId)) {
         throw new Error(`Model 已存在: ${normalizedProviderId}/${normalizedModelId}`);
       }
@@ -381,7 +501,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       const provider = current.providers.get(normalizedProviderId);
       const builtinModelIds =
         membership?.inheritedModelIds ??
-        resolveProviderBuiltinModelIds(zcodeBuiltin, current.providers, normalizedProviderId);
+        resolveProviderBuiltinModelIds(zcodeBuiltin, current, normalizedProviderId);
       // 继承归属保护适用于 Facade 和底层直接调用，不能只在有动态上下文时检查。
       if (builtinModelIds.includes(currentId))
         throw new Error(`Built-in Model 不能重命名: ${normalizedProviderId}/${currentId}`);
@@ -427,8 +547,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       assertMembershipCurrent(membership, id, current);
       const provider = current.providers.get(id);
       const inherited =
-        membership?.inheritedModelIds ??
-        resolveProviderBuiltinModelIds(builtin, current.providers, id);
+        membership?.inheritedModelIds ?? resolveProviderBuiltinModelIds(builtin, current, id);
       if (!inherited.includes(model) && !provider?.personalModelIds?.includes(model)) {
         throw new Error(`Model 不存在: ${id}/${model}`);
       }
@@ -473,7 +592,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       const provider = current.providers.get(normalizedProviderId);
       const builtinModelIds =
         membership?.inheritedModelIds ??
-        resolveProviderBuiltinModelIds(zcodeBuiltin, current.providers, normalizedProviderId);
+        resolveProviderBuiltinModelIds(zcodeBuiltin, current, normalizedProviderId);
       const builtinSet = new Set(builtinModelIds);
       if (originalId !== nextId && builtinSet.has(originalId)) {
         throw new Error(`Built-in Model 不能重命名: ${normalizedProviderId}/${originalId}`);
@@ -531,7 +650,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       const provider = current.providers.get(normalizedProviderId);
       const inherited =
         membership?.inheritedModelIds ??
-        resolveProviderBuiltinModelIds(builtin, current.providers, normalizedProviderId);
+        resolveProviderBuiltinModelIds(builtin, current, normalizedProviderId);
       if (inherited.includes(normalizedModelId))
         throw new Error(`Built-in Model 不能删除: ${normalizedProviderId}/${normalizedModelId}`);
       if (!provider?.personalModelIds?.includes(normalizedModelId)) {
@@ -572,6 +691,8 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
     return this.#personalRepository.update((current) => ({
       // Provider/Model/排序只修改自己的成员，不能因共用文件清掉默认选择。
       defaultModelSelection: current.defaultModelSelection,
+      modelCatalogs: current.modelCatalogs,
+      auxiliaryModelSelection: current.auxiliaryModelSelection,
       ...transform(current),
     }));
   }
@@ -731,14 +852,15 @@ function resolveTemplateBaseline(
 
 function resolveProviderBuiltinModelIds(
   builtin: ProviderConfigLayerSnapshot,
-  personalProviders: ProviderConfigMap,
+  personal: ProviderConfigLayerSnapshot,
   providerId: ProviderId,
 ): readonly ModelId[] {
-  return (
-    builtin.providers.get(providerId)?.builtinModelIds ??
-    resolveTemplateBaseline(builtin, personalProviders, providerId)?.builtinModelIds ??
-    []
-  );
+  return [
+    ...(builtin.providers.get(providerId)?.builtinModelIds ??
+      resolveTemplateBaseline(builtin, personal.providers, providerId)?.builtinModelIds ??
+      []),
+    ...(personal.modelCatalogs?.[providerId]?.models.map((model) => model.modelId) ?? []),
+  ];
 }
 
 function nextPersonalProviderLabel(seed: string, providers: ProviderConfigMap): string {

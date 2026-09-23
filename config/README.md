@@ -26,3 +26,11 @@ default.json 为随客户端分发的内置默认配置；历史上曾经 CDN �
 现版本无请求或 URL 构造链路，只依赖本目录内置文件，其他字段与既有消费者保持不变。
 
 详细规则见 [用户社群入口配置](../docs/ui/settings-community-link-config.md)。
+
+## ModelLink 默认地址
+
+构建 Desktop 或 Web 前，通过环境变量或根目录未跟踪的 `.env.local` 设置 `ZCODE_MODELLINK_BASE_URL`（填写完整 Base URL，通常含 `/v1`）。两端使用相同变量；仓库不提供实际 ModelLink 地址。
+
+它只预填新建的 ModelLink Chat / Responses 渠道，未设置则留空；用户可以修改，已有渠道不受影响。API Key 仍在界面填写，不通过此变量注入。改变构建变量后需要重新构建，它不会在已安装应用中动态更新。
+
+`ZCODE_BASE_URL` 仍表示 ZCode 控制面/官方网关地址，与 ModelLink 地址独立。

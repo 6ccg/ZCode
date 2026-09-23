@@ -94,6 +94,31 @@ export function useModelProviders(target: {
     [commitProviderSettingsView, providerSettingsService],
   );
 
+  const refreshModelCatalog = useCallback(
+    async (providerId: string) => {
+      commitProviderSettingsView(await providerSettingsService.refreshModelCatalog(providerId));
+    },
+    [commitProviderSettingsView, providerSettingsService],
+  );
+  const detachCatalogModel = useCallback(
+    async (providerId: string, modelId: string) => {
+      commitProviderSettingsView(
+        await providerSettingsService.detachCatalogModel(providerId, modelId),
+      );
+    },
+    [commitProviderSettingsView, providerSettingsService],
+  );
+  const saveAuxiliaryModelSelection = useCallback(
+    async (
+      selection: Parameters<typeof providerSettingsService.saveAuxiliaryModelSelection>[0],
+    ) => {
+      commitProviderSettingsView(
+        await providerSettingsService.saveAuxiliaryModelSelection(selection),
+      );
+    },
+    [commitProviderSettingsView, providerSettingsService],
+  );
+
   const addPersonalModel = useCallback(
     (
       providerId: string,
@@ -224,6 +249,9 @@ export function useModelProviders(target: {
     refresh,
     saveProvider,
     createPersonalProvider,
+    refreshModelCatalog,
+    detachCatalogModel,
+    saveAuxiliaryModelSelection,
     addPersonalModel,
     savePersonalModelDraft,
     setPersonalModelEnabled,

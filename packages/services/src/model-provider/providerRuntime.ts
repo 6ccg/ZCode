@@ -1,6 +1,7 @@
 import {
   NodeModelSelectionConfigRepository,
   createNodeModelSelectionFacade,
+  loadModelLinkCatalog,
 } from "@zcode/provider-node";
 import {
   ProviderRegistryService,
@@ -145,6 +146,18 @@ function createSettingsMutationTarget(
   const configService = configRuntime.configService;
   return {
     createPersonalProvider: (input) => configService.createPersonalProvider(input),
+    saveAuxiliaryModelSelection: (selection) =>
+      configService.saveAuxiliaryModelSelection(selection),
+    detachCatalogModel: (providerId, modelId) =>
+      configService.detachCatalogModel(providerId, modelId),
+    refreshModelCatalog: async (providerId) => {
+      const personal = await configRuntime.personalRepository.read();
+      const provider = personal.providers.get(providerId);
+      if (!provider || !personal.modelCatalogs?.[providerId])
+        throw new Error("ModelLink 渠道不存在");
+      const models = await loadModelLinkCatalog(provider);
+      await configService.saveModelCatalog(providerId, models, personal.revision);
+    },
     savePersonalProviderOverlay: (providerId, config, membership, metadata) =>
       configService.savePersonalProviderOverlay(providerId, config, membership, metadata),
     deletePersonalProvider: (providerId) => configService.deletePersonalProvider(providerId),

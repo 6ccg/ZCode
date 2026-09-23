@@ -268,7 +268,11 @@ export function ProviderConnectionSection({
           <label className="mb-1 block text-ui-base text-foreground-subtle">
             {intl.formatMessage({ id: "settings.modelProvider.apiFormat" })}
           </label>
-          <ProviderApiFormatSelect value={apiFormat} onChange={onApiFormatChange} />
+          <ProviderApiFormatSelect
+            value={apiFormat}
+            onChange={onApiFormatChange}
+            disabled={Boolean(provider.catalog)}
+          />
         </div>
       ) : null}
     </>
@@ -344,6 +348,8 @@ function createEmptyModel(): ProviderSettingsFormModel {
 }
 
 export function ProviderModelsSection({
+  onDetachCatalogModel,
+  restrictedMedia = false,
   providerId,
   providerName,
   providerEnabled = true,
@@ -357,6 +363,8 @@ export function ProviderModelsSection({
   onReorderModelIds,
   settingsRevision = 0,
 }: {
+  restrictedMedia?: boolean;
+  onDetachCatalogModel?: (modelId: string) => Promise<void>;
   providerId: string;
   providerName?: string;
   providerEnabled?: boolean;
@@ -503,6 +511,12 @@ export function ProviderModelsSection({
               return (
                 <>
                   <ModelRowInput
+                    restrictedMedia={restrictedMedia}
+                    onDetachCatalogModel={
+                      model.builtin && onDetachCatalogModel
+                        ? () => onDetachCatalogModel(model.modelId)
+                        : undefined
+                    }
                     key={`${providerId}/${model.modelId}`}
                     providerId={providerId}
                     providerName={providerName}
@@ -550,6 +564,7 @@ export function ProviderModelsSection({
       )}
       <>
         <ProviderModelMetadataDialog
+          restrictedMedia={restrictedMedia}
           onRestore={() => {
             setAddDraftErrorField(null);
             setAddCommitError(null);

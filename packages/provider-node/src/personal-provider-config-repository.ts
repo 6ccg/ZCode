@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import {
   ModelConfigRules,
   ProviderConfigMap,
@@ -12,6 +13,7 @@ import {
   decodeProviderConfigFile,
   encodeProviderConfigFile,
 } from "./provider-config-file-codec.js";
+import { PERSONAL_PROVIDER_CONFIG_FILE_NAME } from "./runtime-paths.js";
 
 export interface NodePersonalProviderConfigRepositoryOptions {
   readonly filePath: string;
@@ -79,6 +81,8 @@ export class NodePersonalProviderConfigRepository implements PersonalProviderCon
           models: next.models,
           providerOrder: next.providerOrder,
           defaultModelSelection: next.defaultModelSelection,
+          modelCatalogs: next.modelCatalogs,
+          auxiliaryModelSelection: next.auxiliaryModelSelection,
         });
         const committed = await this.#writeLocked(update);
         const snapshot = snapshotFromUpdate(committed);
@@ -112,7 +116,13 @@ export class NodePersonalProviderConfigRepository implements PersonalProviderCon
     // 多个进程纯读取也争排他锁，慢 IO 会把轮询放大成锁超时。
     // 正式文件通过同目录临时文件原子替换，纯读可以直接观察已提交的完整文档。
     const file = await readJsonFileIfExists(this.#filePath);
-    if (file === null && !this.#importLegacy) return snapshotFromUpdate(emptyUpdate());
+    if (
+      file === null &&
+      !this.#importLegacy &&
+      basename(this.#filePath) !== PERSONAL_PROVIDER_CONFIG_FILE_NAME
+    ) {
+      return snapshotFromUpdate(emptyUpdate());
+    }
     if (file !== null) {
       const update = decodeProviderConfigFile(file.value);
       if (JSON.stringify(file.value) === JSON.stringify(encodeProviderConfigFile(update))) {
@@ -126,7 +136,14 @@ export class NodePersonalProviderConfigRepository implements PersonalProviderCon
   async #readLocked(): Promise<ProviderConfigLayerSnapshot> {
     const file = await readJsonFileIfExists(this.#filePath);
     if (file === null) {
-      const imported = await this.#importLegacy?.();
+      // 原版只识别 v1；首次建立修改版快照时只读原文件，避免升级写回后原版无法加载。
+      const original =
+        basename(this.#filePath) === PERSONAL_PROVIDER_CONFIG_FILE_NAME
+          ? await readJsonFileIfExists(join(dirname(this.#filePath), "provider_config.json"))
+          : null;
+      const imported = original
+        ? decodeProviderConfigFile(original.value)
+        : await this.#importLegacy?.();
       const update = imported ?? emptyUpdate();
       if (imported) return snapshotFromUpdate(await this.#writeLocked(update));
       return snapshotFromUpdate(update);
@@ -268,5 +285,7 @@ function snapshotFromUpdate(update: ProviderConfigLayerUpdate): ProviderConfigLa
     // 快照必须与 revision 对应的磁盘内容一致；补空数组会让未声明排序的文件在 CAS 时误报变化。
     providerOrder: update.providerOrder,
     defaultModelSelection: update.defaultModelSelection,
+    modelCatalogs: update.modelCatalogs ?? {},
+    auxiliaryModelSelection: update.auxiliaryModelSelection,
   });
 }

@@ -2301,6 +2301,13 @@ export function createLocalServices(options: {
       async readCurrentModel() {
         // Git sidecar 属于目标 Environment；初始模型直接读取同一 Host View，
         // 不再通过临时 Agent workspace state 反推模型与 reasoning。
+        await providerRuntime.start();
+        const auxiliary = providerRuntime.registryService.getAuxiliaryModelSelection();
+        if (auxiliary) {
+          if (!providerRuntime.registryService.validateSelection(auxiliary).ok)
+            throw new Error("辅助模型或思维档位不可用，请在模型设置中重新选择");
+          return auxiliary;
+        }
         return (await providerRuntime.modelSelection.getView()).preferredSelection ?? null;
       },
     },
