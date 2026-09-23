@@ -1,14 +1,15 @@
 import {
   ZCODE_PRODUCT_FLAVOR,
+  ZCODE_APP_UPDATES_ENABLED,
   type ZCodeProductFlavor,
   type UpdateStatePayload,
 } from "@zcode/shared";
 
-// 更新入口跟随产品身份而不是后端环境：Preview 身份（含生产后端的 Preview）禁用更新器。
+// 修改版保留 production 身份，更新入口还必须遵守共享产品策略。
 export function shouldShowDesktopUpdateEntry(
   flavor: ZCodeProductFlavor = ZCODE_PRODUCT_FLAVOR,
 ): boolean {
-  return flavor === "production";
+  return ZCODE_APP_UPDATES_ENABLED && flavor === "production";
 }
 
 export function getUpdateMenuLabelId(state: UpdateStatePayload | null) {

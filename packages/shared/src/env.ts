@@ -40,6 +40,9 @@ export const ZCODE_PRODUCT_FLAVOR = normalizeZCodeProductFlavor(
 export const ZCODE_APP_VERSION_ENV = "ZCODE_APP_VERSION" as const;
 export const ZCODE_BUILD_COMMIT_ID_ENV = "ZCODE_BUILD_COMMIT_ID" as const;
 
+// 修改版没有对应的官方更新包；保留 production 身份也必须关闭更新，避免被官方包覆盖。
+export const ZCODE_APP_UPDATES_ENABLED: boolean = false;
+
 // ── 运行时环境变量（不经过编译打包，启动时从 process.env 读取） ──
 // 启用调试模式，值为 inspect-brk 的端口号，如 ZCODE_DEBUG=9230
 export const RUNTIME_ZCODE_DEBUG =

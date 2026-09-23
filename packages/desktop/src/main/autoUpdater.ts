@@ -9,6 +9,7 @@ import {
   PlatformChannels,
   resolveRuntimeZCodeEndpointOrigin,
   ZCODE_VERSION,
+  ZCODE_APP_UPDATES_ENABLED,
   type ElectronReleaseChannel,
   type Locale,
   type PostUpdateReleaseNotesPayload,
@@ -56,9 +57,7 @@ const acknowledgedPostUpdateReleaseNotesVersions = new Set<string>();
 const cancelledDownloadTokens = new WeakSet<CancellationToken>();
 let pendingCancelledDownloadErrorCount = 0;
 let autoUpdaterSettingService: SettingServiceLike | undefined;
-// initAutoUpdater({ enabled: false }) 只清轮询并 return，electron-updater 实例保持未配置
-// （占位 feed、autoDownload 默认值）。任何漏改成按身份判断的入口若仍调用手动检查，
-// 都会对占位 feed 发真实请求。这里记住“本 flavor 已禁用”，让手动检查在模块内部 fail-closed。
+// 停用时 electron-updater 实例保持未配置；所有检查和下载路径共用运行时可用性判断。
 let autoUpdaterDisabledForProductFlavor = false;
 
 type SettingServiceLike = Pick<ISettingService, "get" | "update">;
@@ -94,7 +93,7 @@ type UpdateDownloadedInfoLike = {
 type RuntimeUpdateFeedSource = { url: string };
 
 type AutoUpdaterMenuState = UpdateStatePayload;
-let menuState: AutoUpdaterMenuState = { kind: "idle", enabled: true };
+let menuState: AutoUpdaterMenuState = { kind: "idle", enabled: ZCODE_APP_UPDATES_ENABLED };
 
 export type ForceAutoUpdateState =
   | { kind: "checking" }
@@ -152,7 +151,12 @@ function isDevAutoUpdateEnabled(): boolean {
 }
 
 function canUseAutoUpdaterInCurrentRuntime(): boolean {
-  return app.isPackaged || isDevAutoUpdateEnabled();
+  // 更新渠道设置也会触发此路径；仅在启动时停用会漏掉后续设置事件和旧入口。
+  return (
+    ZCODE_APP_UPDATES_ENABLED &&
+    !autoUpdaterDisabledForProductFlavor &&
+    (app.isPackaged || isDevAutoUpdateEnabled())
+  );
 }
 
 function shouldRelaunchForDevAutoUpdateInstall(): boolean {
@@ -1184,7 +1188,7 @@ async function clearSkippedUpdateVersionForManualCheck(
 
 function downloadAvailableUpdate(reason = "renderer") {
   if (!canUseAutoUpdaterInCurrentRuntime()) {
-    logger.info(`[auto-update] skip ${reason} download: not packaged`);
+    logger.info(`[auto-update] skip ${reason} download: disabled or not packaged`);
     return;
   }
 
@@ -1288,6 +1292,8 @@ export function setAutoUpdaterMenuLocale(locale: Locale) {
 }
 
 export async function hydratePendingPostUpdateReleaseNotes(settingService: SettingServiceLike) {
+  // 两版共享设置目录，但修改版不能恢复原版遗留的待安装版本或更新弹窗。
+  if (!ZCODE_APP_UPDATES_ENABLED) return;
   const settings = await settingService.get();
   pendingPostUpdateReleaseNotes = settings.pendingPostUpdateReleaseNotes ?? null;
   deliveredPostUpdateReleaseNotesWebContentsId = null;
@@ -1356,7 +1362,7 @@ export function refreshAutoUpdaterReleaseChannel(
   const nextChannel: ElectronReleaseChannel = receivePreviewUpdates ? "preview" : "stable";
 
   if (!canUseAutoUpdaterInCurrentRuntime()) {
-    logger.info(`[auto-update] skip ${reason}: not packaged`);
+    logger.info(`[auto-update] skip ${reason}: disabled or not packaged`);
     return;
   }
 
@@ -1460,13 +1466,14 @@ export async function acknowledgePostUpdateReleaseNotes(
 }
 
 export async function initAutoUpdater(options: InitAutoUpdaterOptions = {}): Promise<void> {
-  if (options.enabled === false) {
+  if (!ZCODE_APP_UPDATES_ENABLED || options.enabled === false) {
     autoUpdaterDisabledForProductFlavor = true;
     if (autoUpdatePollTimer) {
       clearInterval(autoUpdatePollTimer);
       autoUpdatePollTimer = null;
     }
-    logger.info("[auto-update] disabled for this desktop product flavor");
+    setAutoUpdaterMenuState({ kind: "idle", enabled: false });
+    logger.info("[auto-update] disabled by desktop product policy");
     return;
   }
   autoUpdaterDisabledForProductFlavor = false;
@@ -1778,7 +1785,7 @@ export function requestForceAutoUpdate(
   onStateChange({ kind: "checking" });
 
   if (!canUseAutoUpdaterInCurrentRuntime()) {
-    const message = "not packaged";
+    const message = "disabled or not packaged";
     logger.info(`[force-update] 自动升级跳过：${message}`);
     onStateChange({ kind: "dev-skipped", message });
     return dispose;
@@ -1850,16 +1857,7 @@ export function checkForUpdateMenuClick(originWindow?: BrowserWindow | null) {
   }
 
   if (!canUseAutoUpdaterInCurrentRuntime()) {
-    logger.info("[auto-update] skip manual check: not packaged");
-    targetWindow.webContents.send(PlatformChannels.UpdateCheckResult, {
-      kind: "dev-skipped",
-    } satisfies UpdateCheckResultPayload);
-    return;
-  }
-
-  if (autoUpdaterDisabledForProductFlavor) {
-    // 入口本应已按产品身份隐藏；这里是最后一道闸，不让未初始化的 updater 实例向占位 feed 发请求。
-    logger.info("[auto-update] skip manual check: updater disabled for this product flavor");
+    logger.info("[auto-update] skip manual check: disabled or not packaged");
     targetWindow.webContents.send(PlatformChannels.UpdateCheckResult, {
       kind: "dev-skipped",
     } satisfies UpdateCheckResultPayload);
