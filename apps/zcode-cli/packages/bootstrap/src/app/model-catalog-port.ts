@@ -1,7 +1,7 @@
 // ============================================================
 // ModelCatalogPort 的宿主实现：Provider Registry → 工具层看得见的模型目录
 // ============================================================
-// 端口契约见 contracts/src/interfaces/model-catalog.port.ts。存在的理由只有一个：
+// 端口契约见 contracts/src/interfaces/model-catalog.port.ts，同时承载辅助模型选择的只读事实。
 // `CreateWorkflow` / `AmendWorkflow` 的 `subagent_model` 要把用户说的模型名解析成一次
 // workflow run 的子代理选型，而 core 看不见 provider 注册表。本模块把「有哪些模型」这件宿主
 // 事实递过去，解析本身留在 core 的纯函数里。
@@ -37,6 +37,7 @@ interface ModelCatalogPortDeps {
  */
 export function createModelCatalogPort(deps: ModelCatalogPortDeps): ModelCatalogPort {
   return {
+    getAuxiliaryModelSelection: () => deps.registry.getAuxiliaryModelSelection?.(),
     listModels(): ModelCatalogEntry[] {
       // 这一行就是上面那条纪律的全部实现。任何把它提到闭包外的「优化」都在重演同一问题。
       const view = deps.registry.getView();

@@ -2735,6 +2735,13 @@ const enUS: Record<string, string> = {
     "Catalog saved. Fetch again to update models and capabilities.",
   "settings.modelProvider.catalogSetup":
     "Save your custom Base URL and API Key, then fetch models.",
+  "settings.modelProvider.auxiliaryTitle": "Auxiliary text model",
+  "settings.modelProvider.auxiliaryDescription":
+    "Used for conversation titles, goal titles and Git commit messages. Choose its model and reasoning level independently.",
+  "settings.modelProvider.auxiliaryFollow": "Use existing defaults",
+  "settings.modelProvider.auxiliaryReasoning": "Auxiliary reasoning level",
+  "settings.modelProvider.auxiliaryUnavailable":
+    "The auxiliary model or reasoning level is unavailable. Select it again.",
   "settings.modelProvider.createFailed": "Could not create the channel. Please try again.",
   "settings.modelProvider.edit": "Edit",
   "settings.modelProvider.editModel": "Edit model settings",

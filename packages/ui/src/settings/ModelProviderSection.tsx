@@ -39,6 +39,7 @@ import {
 import { ModelProviderSectionDetail } from "./model-provider-section/Detail.js";
 import { ModelProviderSectionLayout } from "./model-provider-section/SectionLayout.js";
 import { ProviderTemplatePicker } from "./model-provider-section/ProviderTemplatePicker.js";
+import { AuxiliaryModelSelector } from "./model-provider-section/AuxiliaryModelSelector.js";
 import type { CodingPlanLoginOptions } from "./model-provider-section/codingPlanPricingCards.js";
 import { useModelProviderNavigation } from "./model-provider-section/useModelProviderNavigation.js";
 import { reportPresetSubscriptionSuccess } from "./model-provider-section/oauthActions.js";
@@ -261,6 +262,7 @@ export function ModelProviderSection({
     createPersonalProvider,
     refreshModelCatalog,
     detachCatalogModel,
+    saveAuxiliaryModelSelection,
     addPersonalModel,
     savePersonalModelDraft,
     setPersonalModelEnabled,
@@ -1072,6 +1074,14 @@ export function ModelProviderSection({
       }}
       addProviderLabel={intl.formatMessage({ id: "settings.modelProvider.addProviderAction" })}
       onAddProvider={() => setTemplatePickerOpen(true)}
+      auxiliaryControl={
+        providerSettingsView ? (
+          <AuxiliaryModelSelector
+            view={providerSettingsView}
+            onSave={saveAuxiliaryModelSelection}
+          />
+        ) : undefined
+      }
       navigationGroups={navigationGroups}
       selectedNodeKey={selectedNodeKey}
       onSelectNavItem={handleSelectNavItem}

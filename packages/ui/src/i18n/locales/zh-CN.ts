@@ -2556,6 +2556,12 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.detachCatalogModel": "转为手动模型",
   "settings.modelProvider.catalogLoaded": "目录已保存，可重新获取以更新模型与能力。",
   "settings.modelProvider.catalogSetup": "请先填写并保存自定义 Base URL 和 API Key，再获取模型。",
+  "settings.modelProvider.auxiliaryTitle": "辅助文本模型",
+  "settings.modelProvider.auxiliaryDescription":
+    "用于自动标题、目标小标题和 Git 提交说明。模型与思维档位独立于主对话。",
+  "settings.modelProvider.auxiliaryFollow": "使用原有默认模型",
+  "settings.modelProvider.auxiliaryReasoning": "辅助模型思维档位",
+  "settings.modelProvider.auxiliaryUnavailable": "辅助模型或思维档位已不可用，请重新选择。",
   "settings.modelProvider.createFailed": "创建渠道失败，请重试。",
   "settings.modelProvider.edit": "编辑",
   "settings.modelProvider.editModel": "编辑模型配置",
