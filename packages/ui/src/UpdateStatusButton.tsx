@@ -1,4 +1,5 @@
 import type { IPlatformService, UpdateStatePayload } from "@zcode/shared";
+import { ZCODE_APP_UPDATES_ENABLED } from "@zcode/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/components/lib/utils.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
@@ -100,7 +101,7 @@ export function UpdateStatusButton({
     setDialogOpen(true);
   }, [platform]);
 
-  if (!displayVersion) return null;
+  if (!ZCODE_APP_UPDATES_ENABLED || !displayVersion) return null;
 
   // 更新弹窗和按钮 hover 共用同一个更新日志标题，避免 feed 自带 releaseName 与正文标题重复。
   const releaseNotesTitle = intl.formatMessage(
