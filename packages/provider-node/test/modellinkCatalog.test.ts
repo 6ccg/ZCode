@@ -295,14 +295,21 @@ test("catalog snapshot survives restart, preserves manual overrides and rejects 
       ),
       (await runtime.personalRepository.read()).revision,
     );
+    await runtime.configService.saveAuxiliaryModelSelection({
+      providerId: id,
+      modelId: "chat-model",
+      options: { reasoningLevel: "high" },
+    });
     const saved = JSON.parse(await readFile(file, "utf8"));
     assert.equal(saved.schemaVersion, 2);
+    assert.equal(saved.config.auxiliaryModelSelection.options.reasoningLevel, "high");
     assert.equal(saved.config.modelCatalogs[id].models[0].modelId, "chat-model");
     const provisioned = decodeProviderConfigFile({
       schemaVersion: 2,
       config: providerProvisioningPersonalConfigSchema.parse(saved.config),
     });
     assert.deepEqual(provisioned.modelCatalogs, saved.config.modelCatalogs);
+    assert.equal(provisioned.auxiliaryModelSelection?.options?.reasoningLevel, "high");
     runtime.dispose();
     runtime = new NodeProviderConfigRuntime(options);
     const afterRestart = new ProviderConfigResolver().resolve({
