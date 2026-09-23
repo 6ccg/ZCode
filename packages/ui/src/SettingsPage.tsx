@@ -13,6 +13,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ButtonHTMLAttributes,
   type ReactNode,
 } from "react";
@@ -90,6 +91,7 @@ import { HooksSection } from "@/settings/HooksSection.js";
 import { WorkspaceFileSearchSection } from "@/settings/WorkspaceFileSearchSection.js";
 import { MemorySettingsSection } from "@/settings/MemorySettingsSection.js";
 import { PersonalizationSection } from "@/settings/PersonalizationSection.js";
+import { BuiltinPromptsSection } from "@/settings/BuiltinPromptsSection.js";
 import { BrowserSettingsSection } from "@/settings/BrowserSettingsSection.js";
 import { ComputerUseSection } from "@/settings/ComputerUseSection.js";
 import { ShortcutSettingsSection } from "@/settings/ShortcutSettingsSection.js";
@@ -300,7 +302,7 @@ export function SettingsPage({
   isWebRemoteControl = false,
   windowsWindowControlsRightPaddingPx: _windowsWindowControlsRightPaddingPx,
   captionWorkspacePath,
-  onBack,
+  onBack: onBackRequested,
   onCreateTask,
   onOpenWorkspace,
   onOpenRemoteWorkspace,
@@ -339,6 +341,19 @@ export function SettingsPage({
   const usesInlineWindowControls = Boolean(isWindowsDesktop || isLinuxDesktop);
   const platform = usePlatform();
   const remoteWorkspaceController = useOptionalRemoteWorkspaceController();
+  const builtinPromptNavigationGuard = useRef<(() => Promise<boolean>) | null>(null);
+  const onBack = onBackRequested
+    ? () => {
+        void (async () => {
+          if (
+            builtinPromptNavigationGuard.current &&
+            !(await builtinPromptNavigationGuard.current())
+          )
+            return;
+          onBackRequested();
+        })();
+      }
+    : undefined;
   const [activeSection, setActiveSection] = useState<SettingsSectionId>(() => {
     const initialSection = consumeInitialSettingsSection("general");
     const visibleInitialSection = resolveSettingsSectionForPlatform(
@@ -677,7 +692,13 @@ export function SettingsPage({
   const openOccupationOnboarding = () => setNewUserOnboardingOpen(true);
   const requestMigrationDialog = useZCodeStore((state) => state.requestOnboardingDialog);
   const setActiveSettingsSection = useCallback(
-    (section: SettingsSectionId, fallbackSection: SettingsSectionId = activeSection) => {
+    async (section: SettingsSectionId, fallbackSection: SettingsSectionId = activeSection) => {
+      if (
+        section !== activeSection &&
+        builtinPromptNavigationGuard.current &&
+        !(await builtinPromptNavigationGuard.current())
+      )
+        return;
       const resolvedSection = resolveSettingsSection(section, fallbackSection);
       setActiveSection(resolvedSection);
       writeLastSettingsSectionPreference(resolvedSection);
@@ -2104,6 +2125,8 @@ export function SettingsPage({
                               settingService={localHostServices.settingService}
                               isDesktop={Boolean(isDesktop)}
                             />
+                          ) : activeSection === "builtinPrompts" ? (
+                            <BuiltinPromptsSection navigationGuardRef={builtinPromptNavigationGuard} />
                           ) : activeSection === "memory" ? (
                             <ServiceProvider services={localHostServices}>
                               {/* Memory catalog 始终使用本地 Host，避免远程 workspace 误读本机数据。 */}
