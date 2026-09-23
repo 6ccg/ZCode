@@ -402,6 +402,11 @@ export function registerDeepLinkProtocol(
   },
   options: { iconPath?: string } = {},
 ) {
+  // Windows 免安装版不能留下系统协议登记；旧入口仅由用户手动执行一次性脚本清理。
+  if (process.platform === "win32") {
+    return;
+  }
+
   const scheme = "zcode";
 
   // 外部 URL 必须位于 -- 后；否则 Windows 引号拆分可把 URL 内容变成 Electron 启动参数。
