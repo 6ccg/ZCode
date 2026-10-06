@@ -20,6 +20,7 @@ import { recordModelUsageFact } from "./usage-observability.js";
 import { createRuntimeModel } from "./runtime-model.js";
 import { normalizeStreamError } from "../helpers/index.js";
 import { auxiliaryModelOptions } from "../../model/auxiliary-model-options.js";
+import { resolveNormalRequestMaxOutputTokens } from "./model-token-limits.js";
 
 const WORKSPACE_GENERATE_TEXT_TIMEOUT_MS = 60_000;
 const CONNECTIVITY_PROBE_MAX_OUTPUT_TOKENS = 1;
@@ -186,9 +187,16 @@ async function generateWorkspaceTextImpl(
   const abortSignal =
     options?.abortSignal ?? AbortSignal.timeout(WORKSPACE_GENERATE_TEXT_TIMEOUT_MS);
   // Git Commit 调用方曾传入固定 256，Core 又按 querySource 丢弃，形成虚假接口。
-  // 通用生成入口只处理调用方真实提供的预算；Git 辅助调用不再由上游伪造固定上限。
+  // ModelFactory 只绑定思考档位；增强未传预算时必须在请求入口补齐，否则严格校验会拒绝 undefined。
+  // 显式预算和模型绑定预算保持原值；Git 辅助调用仍使用它已绑定的辅助预算。
   const requestMaxOutputTokens =
-    querySource === GIT_COMMIT_MESSAGE_QUERY_SOURCE ? undefined : input.maxOutputTokens;
+    querySource === GIT_COMMIT_MESSAGE_QUERY_SOURCE
+      ? undefined
+      : (input.maxOutputTokens ??
+        model.options.maxOutputTokens ??
+        resolveNormalRequestMaxOutputTokens({
+          modelMaxOutputTokens: model.optionSpecs.maxOutputTokens.max,
+        }));
 
   const modelRequest = {
     abortSignal,

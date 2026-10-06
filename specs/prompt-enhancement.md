@@ -34,6 +34,7 @@
 4. 增强专用选择使用个人配置的可选字段 `promptEnhancementModelSelection`，保存 `providerId`、`modelId` 与 `options.reasoningLevel`。使用现有 ProviderConfigService、个人 Repository、codec 和 provisioning 链路，不另存 API Key 或连接地址。
 5. 设置页与现有模型／内置 Prompt 设置一致，固定归应用主机。切换 SSH 工作区不隐式切换设置源。执行通过现有目标 Host 链路，使用已冻结的配置，并验证目标 Registry 能解析该模型；不把远程 workspacePath 当作本机执行目录。
 6. 保存后下一次增强生效，无需重新构建或重启。已经开始的请求固定使用开始时的模型、档位和模板快照。
+7. 输出预算由 Core 在实际解析模型后确定。通用文本请求未传 `maxOutputTokens` 时，使用模型已绑定的预算或当前模型允许的上限；显式预算保持原值并接受模型校验。增强保留所选思考档位，Git 辅助请求沿用原有预算规则。
 
 ## Prompt 编辑
 
@@ -70,7 +71,7 @@
 
 - `packages/shared` 声明两种模式、可运行时校验的增强输入、四项内置模板与模板组装函数。增强输入包括草稿、受保护片段、可选上下文和已冻结模板，保持 system/user role 分开。
 - Renderer hook 从应用主机的 SettingService 与 ProviderSettingsService 读取同次增强的设置快照，按已定义优先级解析选择，交给目标工作区的 Agent service。组件不自行读取文件或连接模型。
-- 在现有 `IZCodeAgentService` 增加 `enhancePrompt` 与 `cancelPromptEnhancement`，以可序列化的 `operationId` 关联取消；不跨 RPC 传递 AbortSignal。Host 内临时控制器负责取消，并通过现有 `generateWorkspaceText` 的信号与协议取消接口传到模型执行端，完成或取消后释放。
+- 在现有 `IZCodeAgentService` 增加 `enhancePrompt` 与 `cancelPromptEnhancement`，以可序列化的 `operationId` 关联取消；不跨 RPC 传递 AbortSignal。Host 内临时控制器负责取消，并通过现有 `generateWorkspaceText` 的信号与协议取消接口传到模型执行端，完成或取消后释放。ModelFactory 只绑定模型身份与思考档位，Core 的请求入口负责补齐输出预算，避免缺省值在执行器的严格校验中被拒绝。
 - Lexical 公开 API 负责捕获文档、读取组合态、检测正文／结构变化、应用结果及恢复原稿。引用节点和代码片段以唯一占位符参与改写，输出必须完整保留各占位符才自动应用，引用节点按原序列化内容恢复。选区和焦点变化不算改稿。
 - 增强记录由当前 Composer hook 唯一持有，只保留最近一次成功应用的 before/after 文档和模式；等待期间的结构修改即使文字恢复为原样，也使本次请求过期。生成失败、用户编辑、原生撤销、scope 变化与组件卸载均按上面的规则收敛。
 
@@ -79,7 +80,8 @@ flowchart LR
   S[设置页草稿] --> P[现有配置所有者保存]
   P --> F[增强开始时冻结模板与模型]
   C[Composer 冻结内容与版本] --> F
-  F --> M[现有模型链路生成或取消]
+  F --> B[Core 从实际模型补齐输出预算]
+  B --> M[现有模型链路生成或取消]
   M --> G{Composer 身份与版本仍匹配}
   G -->|匹配| A[Lexical 单次编辑与原有草稿保存]
   G -->|已变化| R[保留结果供预览或复制]
@@ -95,6 +97,7 @@ flowchart LR
 5. 核心交互覆盖增强回填与撤销、引用节点保真、等待期间改稿／切会话以及取消后的迟到结果。保留一个生成失败场景，失败不清空草稿。
 6. 两种模式按钮位于发送箭头左侧，初始均为增强动作；每种模式成功后仅原按钮变为撤销，撤销恢复完整原稿且不发模型请求。先整理再补全时，撤销补全回到整理后的版本；手动改稿后旧撤销失效。
 7. 两按钮的右键设置与常规设置入口到达同一配置页并定位对应模式。无鼠标右键时仍可完成模型和 Prompt 配置。
+8. 整理和补全不传输出预算时，经真实模型适配器分别在 Responses／Chat Completions 协议生成请求，预算到达 HTTP 请求且不超过模型上限，思考档位不变。显式越界预算仍在发出网络请求前拒绝。
 
 ## 已执行验证
 
@@ -103,7 +106,8 @@ flowchart LR
 - 隔离浏览器运行生产 hook、按钮和设置组件，模拟 RPC 与模型输出，覆盖两种模式、最近一次撤销、停止、改稿／引用替换、切会话／发送后的迟到结果、失败保稿、右键模式定位、未保存确认、模型／档位与模板到达请求、刷新保留及恢复默认。无截图测试，不访问真实账号、模型端点或用户配置。
 - 现有配置测试模拟原版再次写入普通设置和 v1 Provider 配置，确认修改版的增强模型与 Prompt 保留；并发保存不同 Prompt 条目不互相覆盖。
 - `node scripts/build-desktop-agent-cli.mjs` 构建与暂存成功。此结果不代表完整 Electron 安装包、SSH／手机 attachment 或真实模型请求已验收。
+- 输出预算回归经过真实 AiSdkModelAdapter 与本地 HTTP 端点：修复前复现 `maxOutputTokens: undefined`，修复后两种模式分别在 Responses／Chat Completions 发送合法预算并保留档位；显式越界预算仍拒绝。根仓库与 CLI 类型检查通过，修改文件 Lint／格式检查通过；CLI 全量 Lint 因未改动旧文件的 `max-lines` 违规未通过。
 
 浏览器场景入口为 `packages/ui/test/runPromptEnhancementE2e.mjs`，复用现有 Vite 与 Playwright Core，可将已安装 Chromium 的可执行文件路径作为首个参数。编辑器测试使用 esbuild 处理已有 PNG／SVG 资源后执行 Node test；不增加运行依赖。
 
-本功能相对 Git 基线涉及 41 个文件，净增 2573 行（包含 spec、测试场景和夹具）；草稿与撤销仍归 Composer、临时请求归 Host、持久配置归原有设置服务。
+草稿与撤销归 Composer、临时请求归 Host、请求输出预算归 Core、持久配置归原有设置服务。
