@@ -59,6 +59,7 @@ import {
   type ChannelReplyResult,
 } from "@zcode/shared";
 import { requestPluginReferenceCatalog } from "#src/zcode-agent/pluginReferenceCatalogRequest.js";
+import { PromptEnhancementGenerator } from "./promptEnhancementGenerator.js";
 import {
   localTtftFactsSchema,
   sessionDebugSnapshotSchema,
@@ -4554,6 +4555,9 @@ export function createZCodeAgentService(
     return envelope;
   }
 
+  const promptEnhancement = new PromptEnhancementGenerator((params) =>
+    service.generateWorkspaceText(params),
+  );
   const service: IZCodeAgentService & { disposeAllAndWait(): Promise<void> } = {
     async prepareStorage(params) {
       const client = await processManager.getClient(params);
@@ -6034,8 +6038,18 @@ export function createZCodeAgentService(
       });
     },
 
+    enhancePrompt(params) {
+      return promptEnhancement.generate(params);
+    },
+
+    async cancelPromptEnhancement(params) {
+      return promptEnhancement.cancel(params);
+    },
+
     async generateWorkspaceText(params: ZCodeAgentGenerateWorkspaceTextParams) {
+      params.signal?.throwIfAborted();
       const client = await getClient(params);
+      params.signal?.throwIfAborted();
       // Worker 自己读取 ZCode Built-in / Personal Config；Host 只在执行前确保账号状态形成的
       // Account Config Overlay 已同步，避免新进程先按旧套餐状态创建 Model。
       await ensureAccountProviderConfigSynced({
@@ -6044,6 +6058,7 @@ export function createZCodeAgentService(
         workspace: params,
         refreshRegistry: true,
       });
+      params.signal?.throwIfAborted();
       const operationId = params.signal ? randomUUID() : undefined;
       const cancel = () => {
         if (!operationId) return;
@@ -7796,6 +7811,7 @@ export function createZCodeAgentService(
     async disposeWorkspace(params): Promise<void> {
       const workspaces = processManager.getRuntimeWorkspaces(params);
       if (params.releasePreparation && processManager.isSharedRuntime(params)) {
+        promptEnhancement.disposeWorkspace(params);
         cancelWaitingWorkspaceStartup(resolveWorkspaceKey(params));
         const client = processManager.getExistingClient(params);
         if (client) {
@@ -7813,6 +7829,8 @@ export function createZCodeAgentService(
       }
       for (const target of workspaces.length ? workspaces : [params]) {
         const workspaceKey = resolveWorkspaceKey(target);
+        // 新版共用 Runtime 的重启会影响多个 workspace，逐个取消其增强请求。
+        promptEnhancement.disposeWorkspace(target);
         // 释放不仅要终止当前进程，还要让已排队的 provider-ready continuation 失效；
         // 否则它会在 dispose 完成后把同一个 workspace 的 Agent 再次启动。
         cancelWaitingWorkspaceStartup(workspaceKey);
@@ -7850,6 +7868,7 @@ export function createZCodeAgentService(
     },
 
     disposeAll(): void {
+      promptEnhancement.dispose();
       processManager.disposeAll();
       pluginProcessManager.disposeAll();
       mcpStatusProcessManager.disposeAll();
@@ -7861,6 +7880,7 @@ export function createZCodeAgentService(
     },
 
     async disposeAllAndWait(): Promise<void> {
+      promptEnhancement.dispose();
       await Promise.all([
         processManager.disposeAllAndWait(),
         pluginProcessManager.disposeAllAndWait(),
