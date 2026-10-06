@@ -42,6 +42,7 @@ export const providerProvisioningPersonalConfigSchema = z
     providerOrder: z.array(nonEmptyString).optional(),
     defaultModelSelection: modelSelectionSchema.optional(),
     auxiliaryModelSelection: modelSelectionSchema.optional(),
+    promptEnhancementModelSelection: modelSelectionSchema.optional(),
     modelCatalogs: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
