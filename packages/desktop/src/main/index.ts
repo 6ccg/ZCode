@@ -179,7 +179,6 @@ import {
 } from "./desktopOAuthDeepLink.js";
 import { handleSecondInstanceWorkspaceRequest } from "./desktopSecondInstanceDeepLink.js";
 import { installFinderOpenFolderWorkflow } from "./desktopFinderOpenFolderWorkflow.js";
-import { installWindowsOpenFolderContextMenu } from "./desktopWindowsOpenFolderContextMenu.js";
 import {
   createDeepLinkSingleInstanceData,
   extractWorkspaceOpenPath,
@@ -1994,14 +1993,6 @@ app.whenReady().then(async () => {
     homeDir: app.getPath("home"),
     logger,
   });
-  await installWindowsOpenFolderContextMenu({
-    platform: process.platform,
-    executablePath: process.execPath,
-    argv: process.argv,
-    isDefaultApp: Boolean(process.defaultApp),
-    locale: currentApplicationLocale,
-    logger,
-  });
   try {
     await applyDesktopChromiumNetworkPolicies(session, bootstrapSettings ?? {}, logger);
   } catch (error) {
@@ -2108,16 +2099,6 @@ app.whenReady().then(async () => {
         platform: process.platform,
         locale: currentApplicationLocale,
         homeDir: app.getPath("home"),
-        logger,
-      });
-      // Windows Explorer 右键菜单是注册表持久项，renderer 切换语言不会自动刷新。
-      // 这里跟 macOS Finder Service 一样在 locale 变化时重写菜单文案，避免继续显示旧语言。
-      await installWindowsOpenFolderContextMenu({
-        platform: process.platform,
-        executablePath: process.execPath,
-        argv: process.argv,
-        isDefaultApp: Boolean(process.defaultApp),
-        locale: currentApplicationLocale,
         logger,
       });
       configureDockMenu(
