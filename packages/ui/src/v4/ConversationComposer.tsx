@@ -87,6 +87,10 @@ import {
 } from "@/ChatMediaAttachmentPreviewDialog.js";
 import type { LexicalChatInputHandle } from "@/LexicalChatInput.js";
 import { ChatPromptEditor } from "@/prompt-editor/ChatPromptEditor.js";
+import { usePromptEnhancement } from "@/hooks/usePromptEnhancement.js";
+import { PromptEnhancementControls } from "@/v4/composer/PromptEnhancementControls.js";
+import { PromptEnhancementFeedback } from "@/v4/composer/PromptEnhancementFeedback.js";
+import { buildPromptEnhancementConversationContext } from "@/v4/composer/promptEnhancementContext.js";
 import { usePromptEditorDragState } from "@/prompt-editor/usePromptEditorDragState.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { advanceComposerDraftRevision } from "@/v4/composer/composerDraftRevision.js";
@@ -1092,6 +1096,75 @@ function ConversationComposerImpl({
   }, [workspacePath]);
 
   const mode = snapshot?.inputRouting.mode ?? "startNow";
+  const enhancementReferences = useMemo(
+    () =>
+      JSON.stringify({
+        uiMode: composerDraft.mode,
+        planEnabled: composerDraft.planEnabled,
+        attachments: attachmentsApi.attachments.map((attachment) => ({
+          id: attachment.id,
+          name: attachment.filename,
+        })),
+        selectedReferences: {
+          // 仅比较数量会漏掉“删除一个再添加一个”的引用替换；冻结所选引用的身份与内容，
+          // 让基于旧上下文生成的结果进入预览，不覆盖已改变的草稿。
+          codeComments: codeCommentContexts.map(
+            ({ id, sourcePath, sourceTitle, startLine, endLine, selectedText, comment }) => ({
+              id,
+              sourcePath,
+              sourceTitle,
+              startLine,
+              endLine,
+              selectedText,
+              comment,
+            }),
+          ),
+          webElements: webElementContexts.map(
+            ({ id, pageUrl, pageTitle, selector, tagName, text }) => ({
+              id,
+              pageUrl,
+              pageTitle,
+              selector,
+              tagName,
+              text,
+            }),
+          ),
+          presentationElements: pptxElementReferences.map(
+            ({ id, sourcePath, sourceTitle, sourceFingerprint, selectedText, comment }) => ({
+              id,
+              sourcePath,
+              sourceTitle,
+              sourceFingerprint,
+              selectedText,
+              comment,
+            }),
+          ),
+          conversationSelections: conversationSelectionReferences,
+        },
+      }),
+    [
+      attachmentsApi.attachments,
+      codeCommentContexts,
+      composerDraft.mode,
+      composerDraft.planEnabled,
+      conversationSelectionReferences,
+      pptxElementReferences,
+      webElementContexts,
+    ],
+  );
+  const promptEnhancement = usePromptEnhancement({
+    workspacePath,
+    workspaceIdentity,
+    remoteSessionId,
+    scopeId: draftScopeId,
+    inputApiRef,
+    selection: composerDraft.modelSelection,
+    contextFingerprint: enhancementReferences,
+    readReferenceContext: () => enhancementReferences,
+    readConversationContext: () =>
+      buildPromptEnhancementConversationContext(snapshotRef.current?.rows.window ?? []),
+    canIncludeConversation: Boolean(sessionId),
+  });
   const modifiedEnterSubmits = shouldEnableModifiedEnterSubmit({
     inputRoutingMode: mode,
   });
@@ -1181,6 +1254,7 @@ function ConversationComposerImpl({
       ) {
         return;
       }
+      promptEnhancement.beforeSubmit();
       const sendAction = startUserAction({
         featureId: "conversation.composer.message",
         action: "send",
@@ -1449,6 +1523,7 @@ function ConversationComposerImpl({
       modelSelectionView,
       onSendText,
       pendingShareContext,
+      promptEnhancement.beforeSubmit,
       provider,
       readPlanIdentitySnapshot,
       removeCodeCommentContext,
@@ -2061,6 +2136,11 @@ function ConversationComposerImpl({
             onSendCompressionCommand={onSendCompressionCommand}
           />
         </span>
+        <PromptEnhancementControls
+          controller={promptEnhancement}
+          disabled={disabled || pending || mode === "reject"}
+          hasText={hasText}
+        />
         {showStopControl ? (
           <ControlHintTooltip title={stopTooltipTitle} shortcut="Esc">
             <Button
@@ -2100,6 +2180,8 @@ function ConversationComposerImpl({
     ),
     [
       canSend,
+      promptEnhancement,
+      hasText,
       activeConfigPicker,
       composerPhase,
       composerUsage,
@@ -2271,7 +2353,12 @@ function ConversationComposerImpl({
           // @ 是 Plugin / 文件 / 对话 / 画板主入口；# 会话与 $ / ¥ / ￥ Skills
           // 仍由 MentionPlugin 保留兼容触发，但不在 + 菜单重复展示。
           showMentionButton
-          topContent={topContentNode}
+          topContent={
+            <>
+              {topContentNode}
+              <PromptEnhancementFeedback controller={promptEnhancement} />
+            </>
+          }
           attachmentAction={attachmentAction}
           inputTestId={TID_V4_COMPOSER_INPUT}
           inputApiRef={inputApiRef}

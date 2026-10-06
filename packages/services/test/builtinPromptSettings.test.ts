@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -41,6 +41,19 @@ test("prompt sidecar merges entries without touching original settings", async (
     );
     assert.equal(sidecar.schemaVersion, 1);
     assert.deepEqual(sidecar.overrides, { "auxiliary.title": "TITLE" });
+    await Promise.all([
+      first.setBuiltinPrompt("auxiliary.promptOrganize.system", "ORGANIZE"),
+      second.setBuiltinPrompt("auxiliary.promptExpand.system", "EXPAND"),
+    ]);
+    // 原版再次保存普通设置后，重建修改版服务仍从独立 Prompt 文件读取增强覆盖。
+    const nextOriginalSettings = JSON.stringify({ locale: "zh-CN" });
+    await writeFile(settingsPath, nextOriginalSettings);
+    assert.deepEqual(await createSettingService().getBuiltinPrompts(), {
+      "auxiliary.title": "TITLE",
+      "auxiliary.promptOrganize.system": "ORGANIZE",
+      "auxiliary.promptExpand.system": "EXPAND",
+    });
+    assert.equal(await readFile(settingsPath, "utf8"), nextOriginalSettings);
   } finally {
     if (previous === undefined) delete process.env.ZCODE_DESKTOP_HOME_DIR;
     else process.env.ZCODE_DESKTOP_HOME_DIR = previous;

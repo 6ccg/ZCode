@@ -25,7 +25,15 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
-import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
+import {
+  HistoryPlugin,
+  createEmptyHistoryState,
+  type HistoryState,
+} from "@lexical/react/LexicalHistoryPlugin";
+import {
+  createPromptEnhancementEditorApi,
+  type PromptEnhancementEditorApi,
+} from "@/prompt-editor/promptEnhancementEditor.js";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
   $createParagraphNode,
@@ -68,6 +76,7 @@ export interface ChatComposerPasteEvent {
 }
 
 export interface LexicalChatInputHandle {
+  enhancement?: PromptEnhancementEditorApi;
   clear: () => void;
   focus: () => void;
   getEditorState: () => EditorState;
@@ -1257,8 +1266,10 @@ function insertEditorMention(
 
 function EditorApiPlugin({
   editorApiRef,
+  history,
 }: {
   editorApiRef?: React.MutableRefObject<LexicalChatInputHandle | null>;
+  history: HistoryState;
 }) {
   const [editor] = useLexicalComposerContext();
 
@@ -1267,7 +1278,9 @@ function EditorApiPlugin({
       return;
     }
 
+    const enhancement = createPromptEnhancementEditorApi(editor, history);
     editorApiRef.current = {
+      enhancement,
       clear: () => resetEditor(editor),
       focus: () => editor.focus(),
       getEditorState: () => editor.getEditorState(),
@@ -1301,9 +1314,10 @@ function EditorApiPlugin({
     };
 
     return () => {
+      enhancement.dispose();
       editorApiRef.current = null;
     };
-  }, [editor, editorApiRef]);
+  }, [editor, editorApiRef, history]);
 
   return null;
 }
@@ -1366,6 +1380,7 @@ export function LexicalChatInput({
   appSlashCommands,
   enableMentionPanel = true,
 }: LexicalChatInputProps) {
+  const history = useMemo(createEmptyHistoryState, []);
   const inputMountedAtRef = useRef(Date.now());
   const lastReadyLogKeyRef = useRef<string | null>(null);
   const activeTaskProvider = useChatViewActiveTaskProvider(
@@ -1481,7 +1496,7 @@ export function LexicalChatInput({
       <LexicalComposer initialConfig={initialConfig}>
         <div className="relative">
           <PlainTextPlugin contentEditable={contentEditable} ErrorBoundary={LexicalErrorBoundary} />
-          <HistoryPlugin />
+          <HistoryPlugin externalHistoryState={history} />
           <PromptClipboardPlugin />
           <TextContentPlugin onChange={onChange} taskId={taskId} />
           <KeyboardPlugin
@@ -1495,7 +1510,7 @@ export function LexicalChatInput({
           <PromptHistoryPlugin entries={promptHistory} disabled={disabled} />
           <EditablePlugin editable={!disabled} />
           <E2ELexicalInputBridgePlugin inputTestId={inputTestId} />
-          <EditorApiPlugin editorApiRef={editorApiRef} />
+          <EditorApiPlugin editorApiRef={editorApiRef} history={history} />
           <LeadingChineseSlashAliasPlugin disabled={disabled} />
           <PasteCapturePlugin disabled={disabled} onPaste={onPaste} />
         </div>

@@ -62,6 +62,12 @@ const BASE_SETTINGS_SECTIONS: SettingsSectionDefinition[] = [
     groupId: "agentCapabilities",
   },
   {
+    id: "promptEnhancement",
+    icon: WandSparkles,
+    titleId: "settings.promptEnhancement.title",
+    groupId: "agentCapabilities",
+  },
+  {
     id: "general",
     icon: Settings2,
     titleId: "settings.systemTitle",

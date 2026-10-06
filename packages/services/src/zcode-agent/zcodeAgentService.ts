@@ -1,4 +1,5 @@
 import { requestPluginReferenceCatalog } from "#src/zcode-agent/pluginReferenceCatalogRequest.js";
+import { PromptEnhancementGenerator } from "./promptEnhancementGenerator.js";
 import {
   localTtftFactsSchema,
   sessionDebugSnapshotSchema,
@@ -3330,7 +3331,10 @@ export function createZCodeAgentService(
     return envelope;
   }
 
-  return {
+  const promptEnhancement = new PromptEnhancementGenerator((params) =>
+    service.generateWorkspaceText(params),
+  );
+  const service: IZCodeAgentService & { disposeAllAndWait(): Promise<void> } = {
     async prepareStorage(params) {
       const client = await processManager.getClient(params);
       wireClient(client, params, "chat");
@@ -4352,8 +4356,18 @@ export function createZCodeAgentService(
       });
     },
 
+    enhancePrompt(params) {
+      return promptEnhancement.generate(params);
+    },
+
+    async cancelPromptEnhancement(params) {
+      return promptEnhancement.cancel(params);
+    },
+
     async generateWorkspaceText(params: ZCodeAgentGenerateWorkspaceTextParams) {
+      params.signal?.throwIfAborted();
       const client = await getClient(params);
+      params.signal?.throwIfAborted();
       // Worker 自己读取 ZCode Built-in / Personal Config；Host 只在执行前确保账号状态形成的
       // Account Config Overlay 已同步，避免新进程先按旧套餐状态创建 Model。
       await ensureAccountProviderConfigSynced({
@@ -4361,6 +4375,7 @@ export function createZCodeAgentService(
         reason: "workspace_generate_text",
         workspace: params,
       });
+      params.signal?.throwIfAborted();
       const operationId = params.signal ? randomUUID() : undefined;
       const cancel = () => {
         if (!operationId) return;
@@ -5622,6 +5637,7 @@ export function createZCodeAgentService(
 
     async disposeWorkspace(params): Promise<void> {
       const workspaceKey = resolveWorkspaceKey(params);
+      promptEnhancement.disposeWorkspace(params);
       // 释放不仅要终止当前进程，还要让已排队的 provider-ready continuation 失效；
       // 否则它会在 dispose 完成后把同一个 workspace 的 Agent 再次启动。
       cancelWaitingWorkspaceStartup(workspaceKey);
@@ -5640,6 +5656,7 @@ export function createZCodeAgentService(
     },
 
     disposeAll(): void {
+      promptEnhancement.dispose();
       processManager.disposeAll();
       pluginProcessManager.disposeAll();
       mcpStatusProcessManager.disposeAll();
@@ -5651,6 +5668,7 @@ export function createZCodeAgentService(
     },
 
     async disposeAllAndWait(): Promise<void> {
+      promptEnhancement.dispose();
       await Promise.all([
         processManager.disposeAllAndWait(),
         pluginProcessManager.disposeAllAndWait(),
@@ -5661,4 +5679,5 @@ export function createZCodeAgentService(
       disposeLocalState();
     },
   };
+  return service;
 }

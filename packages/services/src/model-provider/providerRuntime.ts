@@ -148,6 +148,8 @@ function createSettingsMutationTarget(
     createPersonalProvider: (input) => configService.createPersonalProvider(input),
     saveAuxiliaryModelSelection: (selection) =>
       configService.saveAuxiliaryModelSelection(selection),
+    savePromptEnhancementModelSelection: (selection) =>
+      configService.savePromptEnhancementModelSelection(selection),
     detachCatalogModel: (providerId, modelId) =>
       configService.detachCatalogModel(providerId, modelId),
     refreshModelCatalog: async (providerId) => {

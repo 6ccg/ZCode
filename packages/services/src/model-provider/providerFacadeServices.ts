@@ -37,6 +37,9 @@ export interface IProviderSettingsService {
   refreshModelCatalog(providerId: ProviderId): Promise<ProviderSettingsView>;
   detachCatalogModel(providerId: ProviderId, modelId: ModelId): Promise<ProviderSettingsView>;
   saveAuxiliaryModelSelection(selection: ModelSelection | null): Promise<ProviderSettingsView>;
+  savePromptEnhancementModelSelection(
+    selection: ModelSelection | null,
+  ): Promise<ProviderSettingsView>;
   resolveModelConfig(input: ResolveModelConfigInput): Promise<ModelConfigResolution>;
   savePersonalProviderOverlay(
     providerId: ProviderId,
@@ -139,6 +142,10 @@ export function createProviderSettingsService(
     saveAuxiliaryModelSelection: async (selection) => {
       await ensureReady();
       return facade.saveAuxiliaryModelSelection(selection);
+    },
+    savePromptEnhancementModelSelection: async (selection) => {
+      await ensureReady();
+      return facade.savePromptEnhancementModelSelection(selection);
     },
     resolveModelConfig: async (input) => {
       await ensureReady();

@@ -26,6 +26,7 @@ export interface ProviderConfigSnapshot {
   readonly personalProviderOrder?: readonly string[];
   readonly modelCatalogs?: ModelCatalogs;
   readonly auxiliaryModelSelection?: ModelSelection;
+  readonly promptEnhancementModelSelection?: ModelSelection;
 }
 
 export interface AccountProviderConfigSnapshot {

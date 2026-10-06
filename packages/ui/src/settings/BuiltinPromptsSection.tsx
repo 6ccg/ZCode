@@ -12,18 +12,26 @@ import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { useBuiltinPrompts } from "@/hooks/useBuiltinPrompts.js";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog.js";
 import { SettingsFormTextarea } from "./SettingsFormTextarea.js";
+import { getPromptEnhancementModeForPrompt } from "@zcode/shared";
+import { setPendingPromptEnhancementIntent } from "@/lib/settingsNavigation.js";
 
 const GROUPS = ["main", "subagent", "auxiliary"] as const;
 
 export function BuiltinPromptsSection({
   navigationGuardRef,
+  promptIds,
 }: {
   navigationGuardRef: RefObject<(() => Promise<boolean>) | null>;
+  /** 增强页复用同一个编辑器，仅展示当前模式的两个条目。 */
+  promptIds?: readonly BuiltinPromptId[];
 }) {
   const { intl, locale } = useZCodeIntl();
   const { overrides, loading, error, refresh, save } = useBuiltinPrompts();
   const confirm = useConfirmDialog();
-  const [selectedId, setSelectedId] = useState<BuiltinPromptId>("main.prefix");
+  const [selectedId, setSelectedId] = useState<BuiltinPromptId>(promptIds?.[0] ?? "main.prefix");
+  const entries = promptIds
+    ? BUILTIN_PROMPTS.filter((entry) => promptIds.includes(entry.id))
+    : BUILTIN_PROMPTS;
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showDefault, setShowDefault] = useState(false);
@@ -68,6 +76,12 @@ export function BuiltinPromptsSection({
   }, [dirty]);
 
   async function select(id: BuiltinPromptId) {
+    const enhancementMode = getPromptEnhancementModeForPrompt(id);
+    if (!promptIds && enhancementMode) {
+      // 设置页的导航所有者统一处理未保存草稿，避免条目与页面各弹一次确认。
+      setPendingPromptEnhancementIntent(enhancementMode);
+      return;
+    }
     if (id === selectedId || !(await canLeave())) return;
     setSelectedId(id);
     setDraft(null);
@@ -124,32 +138,36 @@ export function BuiltinPromptsSection({
       ) : (
         <div className="flex flex-wrap gap-5">
           <nav aria-label={message("title")} className="w-56 shrink-0 space-y-4">
-            {GROUPS.map((group) => (
-              <div key={group} className="space-y-1">
-                <h3 className="px-2 py-1 text-ui-caption text-foreground-subtle">
-                  {message(`group.${group}`)}
-                </h3>
-                {BUILTIN_PROMPTS.filter((item) => item.group === group).map((item) => (
-                  <Button
-                    key={item.id}
-                    variant="ghost"
-                    aria-current={item.id === selectedId ? "page" : undefined}
-                    data-testid={`builtin-prompt-${item.id}`}
-                    disabled={saving}
-                    className={cn(
-                      "h-auto w-full justify-between gap-2 whitespace-normal px-2 py-2 text-left text-ui-base",
-                      item.id === selectedId && "bg-accent",
-                    )}
-                    onClick={() => void select(item.id)}
-                  >
-                    <span>{item.title[locale]}</span>
-                    <span className="shrink-0 text-ui-xs text-foreground-subtle">
-                      {message(overrides[item.id] !== undefined ? "modified" : "default")}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            ))}
+            {GROUPS.filter((group) => entries.some((entry) => entry.group === group)).map(
+              (group) => (
+                <div key={group} className="space-y-1">
+                  <h3 className="px-2 py-1 text-ui-caption text-foreground-subtle">
+                    {message(`group.${group}`)}
+                  </h3>
+                  {entries
+                    .filter((item) => item.group === group)
+                    .map((item) => (
+                      <Button
+                        key={item.id}
+                        variant="ghost"
+                        aria-current={item.id === selectedId ? "page" : undefined}
+                        data-testid={`builtin-prompt-${item.id}`}
+                        disabled={saving}
+                        className={cn(
+                          "h-auto w-full justify-between gap-2 whitespace-normal px-2 py-2 text-left text-ui-base",
+                          item.id === selectedId && "bg-accent",
+                        )}
+                        onClick={() => void select(item.id)}
+                      >
+                        <span>{item.title[locale]}</span>
+                        <span className="shrink-0 text-ui-xs text-foreground-subtle">
+                          {message(overrides[item.id] !== undefined ? "modified" : "default")}
+                        </span>
+                      </Button>
+                    ))}
+                </div>
+              ),
+            )}
           </nav>
           <div className="min-w-0 flex-1 basis-96 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">

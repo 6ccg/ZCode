@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- 设置导航意图集中管理 sessionStorage、事件桥接和解析校验，拆分会让一次性意图消费顺序更难保证。 */
 import { logger } from "@/logger.js";
+import { promptEnhancementModeSchema, type PromptEnhancementMode } from "@zcode/shared";
 
 export type SettingsSectionId =
   | "general"
@@ -9,6 +10,7 @@ export type SettingsSectionId =
   | "modelProvider"
   | "memory"
   | "builtinPrompts"
+  | "promptEnhancement"
   | "plugin"
   | "mcp"
   | "skill"
@@ -32,6 +34,7 @@ const SETTINGS_SECTION_INTENT_KEY = "zcode-settings-section-intent",
   SETTINGS_PLUGIN_ORIGIN_INTENT_KEY = "zcode-settings-plugin-origin-intent",
   SETTINGS_PLUGIN_SCOPE_KEY_INTENT_KEY = "zcode-settings-plugin-scope-key-intent";
 const SETTINGS_MODEL_PROVIDER_ID_INTENT_KEY = "zcode-settings-model-provider-id-intent";
+const SETTINGS_PROMPT_ENHANCEMENT_MODE_KEY = "zcode-settings-prompt-enhancement-mode-intent";
 const SETTINGS_SECTION_INTENT_EVENT = "zcode:settings-section-intent",
   SETTINGS_LAST_SECTION_STORAGE_KEY = "zcode-settings-last-section";
 const HIDDEN_SETTINGS_SECTIONS = new Set<SettingsSectionId>([
@@ -53,6 +56,7 @@ interface SettingsSectionIntentEventDetail {
   pluginScopeKey?: string;
   usageTab?: SettingsUsageTabTarget;
   modelProviderId?: string;
+  promptEnhancementMode?: PromptEnhancementMode;
 }
 
 export interface SettingsModelProviderTarget {
@@ -68,6 +72,7 @@ function isSettingsSectionId(value: string): value is SettingsSectionId {
     value === "modelProvider" ||
     value === "memory" ||
     value === "builtinPrompts" ||
+    value === "promptEnhancement" ||
     value === "plugin" ||
     value === "mcp" ||
     value === "skill" ||
@@ -222,6 +227,7 @@ export function setPendingSettingsSectionIntent(
     pluginScopeKey?: string;
     modelProviderId?: string;
     usageTab?: SettingsUsageTabTarget;
+    promptEnhancementMode?: PromptEnhancementMode;
   } = {},
 ): void {
   if (typeof window === "undefined") {
@@ -254,6 +260,14 @@ export function setPendingSettingsSectionIntent(
     } else {
       window.sessionStorage.removeItem(SETTINGS_MODEL_PROVIDER_ID_INTENT_KEY);
     }
+    if (options.promptEnhancementMode) {
+      window.sessionStorage.setItem(
+        SETTINGS_PROMPT_ENHANCEMENT_MODE_KEY,
+        options.promptEnhancementMode,
+      );
+    } else {
+      window.sessionStorage.removeItem(SETTINGS_PROMPT_ENHANCEMENT_MODE_KEY);
+    }
   } catch {
     // 忽略浏览器存储异常，不影响主流程。
   }
@@ -269,6 +283,7 @@ export function setPendingSettingsSectionIntent(
         pluginScopeKey: options.pluginScopeKey?.trim() || undefined,
         usageTab: options.usageTab,
         modelProviderId: options.modelProviderId,
+        promptEnhancementMode: options.promptEnhancementMode,
       },
     }),
   );
@@ -286,8 +301,35 @@ function clearPendingSettingsSectionIntent(): void {
     window.sessionStorage.removeItem(SETTINGS_PLUGIN_TAB_INTENT_KEY);
     window.sessionStorage.removeItem(SETTINGS_PLUGIN_ORIGIN_INTENT_KEY);
     window.sessionStorage.removeItem(SETTINGS_PLUGIN_SCOPE_KEY_INTENT_KEY);
+    window.sessionStorage.removeItem(SETTINGS_PROMPT_ENHANCEMENT_MODE_KEY);
   } catch {
     // 忽略浏览器存储异常，不影响主流程。
+  }
+}
+
+export function setPendingPromptEnhancementIntent(mode: PromptEnhancementMode): void {
+  setPendingSettingsSectionIntent("promptEnhancement", { promptEnhancementMode: mode });
+}
+
+/** 与已有 Prompt 来源意图一样，Strict Mode 的初始化读取不提前删除。 */
+export function readPendingPromptEnhancementMode(): PromptEnhancementMode | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const parsed = promptEnhancementModeSchema.safeParse(
+      window.sessionStorage.getItem(SETTINGS_PROMPT_ENHANCEMENT_MODE_KEY),
+    );
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function clearPendingPromptEnhancementMode(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(SETTINGS_PROMPT_ENHANCEMENT_MODE_KEY);
+  } catch {
+    /* 一次性导航意图不影响设置读取。 */
   }
 }
 

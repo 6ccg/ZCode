@@ -90,6 +90,7 @@ export async function readProvisionablePersonalConfig(
         !personal.providerOrder?.length &&
         personal.defaultModelSelection === undefined &&
         personal.auxiliaryModelSelection === undefined &&
+        personal.promptEnhancementModelSelection === undefined &&
         Object.keys(personal.modelCatalogs ?? {}).length === 0
       )
         return personal;

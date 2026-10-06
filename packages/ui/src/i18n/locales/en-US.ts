@@ -1,5 +1,59 @@
 /** English translations */
 const enUS: Record<string, string> = {
+  "chat.promptEnhancement.organize.short": "Polish",
+  "chat.promptEnhancement.organize.title": "Organize wording",
+  "chat.promptEnhancement.organize.undo": "Undo wording changes",
+  "chat.promptEnhancement.organize.stop": "Stop organizing wording",
+  "chat.promptEnhancement.expand.short": "Expand",
+  "chat.promptEnhancement.expand.title": "Expand requirements",
+  "chat.promptEnhancement.expand.undo": "Undo requirement expansion",
+  "chat.promptEnhancement.expand.stop": "Stop expanding requirements",
+  "chat.promptEnhancement.undo": "Undo",
+  "chat.promptEnhancement.stop": "Stop",
+  "chat.promptEnhancement.rightClickHint":
+    "Right-click for enhancement settings. Review the result before sending.",
+  "chat.promptEnhancement.empty": "Write a draft before polishing or expanding it.",
+  "chat.promptEnhancement.modelUnavailable":
+    "The enhancement model or reasoning level is not ready. Check prompt enhancement settings.",
+  "chat.promptEnhancement.connectionUnavailable":
+    "The workspace is connecting. Enhancements will be available when it is ready.",
+  "chat.promptEnhancement.editorUnavailable":
+    "The editor is not ready or text composition is still active. Try again shortly.",
+  "chat.promptEnhancement.undoUnavailable":
+    "The draft or undo history has changed; the original cannot be restored in one step.",
+  "chat.promptEnhancement.failed": "Enhancement failed: {detail}",
+  "chat.promptEnhancement.resultStale":
+    "The draft or references changed. The result is available without replacing your input.",
+  "chat.promptEnhancement.protectedChanged":
+    "The result did not preserve all references or code. It is available for review without replacing your input.",
+  "chat.promptEnhancement.includeConversation": "Include current conversation",
+  "chat.promptEnhancement.draftOnly": "Use only the current draft",
+  "chat.promptEnhancement.viewResult": "View result",
+  "chat.promptEnhancement.resultTitle": "Enhanced prompt",
+  "chat.promptEnhancement.copy": "Copy result",
+  "chat.promptEnhancement.copied": "Result copied",
+  "chat.promptEnhancement.copyFailed": "Copy failed. Select the result text to copy it manually.",
+  "settings.promptEnhancement.title": "Prompt enhancement",
+  "settings.promptEnhancement.description":
+    "Configure the model and prompts for polishing and expanding drafts. Saved changes apply to the next enhancement.",
+  "settings.promptEnhancement.open": "Prompt enhancement settings…",
+  "settings.promptEnhancement.modelTitle": "Prompt enhancement model",
+  "settings.promptEnhancement.modelDescription":
+    "Used only for polishing and expanding drafts. It does not change conversation, title, or Git model selections.",
+  "settings.promptEnhancement.modelFollow": "Follow auxiliary model",
+  "settings.promptEnhancement.modelReasoning": "Enhancement reasoning level",
+  "settings.promptEnhancement.modelUnavailable":
+    "The enhancement model or reasoning level is unavailable. Choose it again.",
+  "settings.promptEnhancement.modelLoading": "Loading model settings…",
+  "settings.promptEnhancement.manageModels": "Manage models",
+  "settings.promptEnhancement.organize": "Organize wording",
+  "settings.promptEnhancement.expand": "Expand requirements",
+  "settings.promptEnhancement.followDescription":
+    "Without an auxiliary model, enhancements follow the current composer model and reasoning level.",
+  "settings.builtinPrompts.variable.input":
+    "JSON data containing the draft and protected references or code",
+  "settings.builtinPrompts.variable.context":
+    "Selected reference metadata and optional conversation context; null when absent",
   "settings.builtinPrompts.title": "Built-in prompts",
   "settings.builtinPrompts.scope":
     "Applies to this app host: your desktop computer, or the server connected to Web. Switching remote workspaces does not edit prompts on the remote host.",
