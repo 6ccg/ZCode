@@ -1,6 +1,7 @@
 import { mainPromptDefinitions } from "./main.js";
 import { subagentsPromptDefinitions } from "./subagents.js";
 import { auxiliaryPromptDefinitions } from "./auxiliary.js";
+import { promptEnhancementPromptDefinitions } from "./prompt-enhancement.js";
 
 export { SECURITY_NOTICE, HARNESS_BLOCK } from "./identity-fragments.js";
 
@@ -8,6 +9,7 @@ export const BUILTIN_PROMPTS = [
   ...mainPromptDefinitions,
   ...subagentsPromptDefinitions,
   ...auxiliaryPromptDefinitions,
+  ...promptEnhancementPromptDefinitions,
 ] as const;
 
 export type BuiltinPromptId = (typeof BUILTIN_PROMPTS)[number]["id"];
