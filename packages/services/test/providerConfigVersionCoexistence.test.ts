@@ -60,11 +60,24 @@ test("modified provider config copies original v1 once and never rewrites it", a
     const sidecar = JSON.parse(await readFile(modifiedPath, "utf8"));
     assert.equal(sidecar.schemaVersion, 2);
     assert.equal(sidecar.config.providerConfigRules.providerRules[0].providerId, "custom-example");
+    const enhancementSelection = {
+      providerId: "custom-example",
+      modelId: "model-a",
+      options: { reasoningLevel: "low" },
+    };
+    await runtime.configService.savePromptEnhancementModelSelection(enhancementSelection);
+    assert.equal(await readFile(originalPath, "utf8"), original);
+    const enhancedSidecar = await readFile(modifiedPath, "utf8");
+    assert.deepEqual(
+      JSON.parse(enhancedSidecar).config.promptEnhancementModelSelection,
+      enhancementSelection,
+    );
     // 模拟原版之后改写其 v1 文件；修改版的 v2 快照不应被反向覆盖。
     await writeFile(originalPath, original.replace("custom-example", "custom-later"));
     const second = await runtime.personalRepository.read();
     assert.ok(second.providers.get("custom-example"));
-    assert.equal(await readFile(modifiedPath, "utf8"), JSON.stringify(sidecar, null, 2));
+    assert.deepEqual(second.promptEnhancementModelSelection, enhancementSelection);
+    assert.equal(await readFile(modifiedPath, "utf8"), enhancedSidecar);
   } finally {
     runtime.dispose();
     setDataBaseDir(null);
