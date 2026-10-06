@@ -88,6 +88,7 @@ import type {
   ZCodeWorkspaceGenerateTextParams,
   ZCodeWorkspaceHookTrustGrantResult,
   ZCodeAutomationBotDeliveryTarget,
+  PromptEnhancementInput,
 } from "@zcode/shared";
 import type {
   ClientHello,
@@ -365,6 +366,16 @@ export interface ZCodeAgentGenerateWorkspaceTextParams extends ZCodeAgentWorkspa
    * 还会被 onRequestTimeout 误判 stale 杀进程。
    */
   requestTimeoutMs?: number;
+}
+
+export interface ZCodeAgentEnhancePromptParams extends ZCodeAgentWorkspaceTarget {
+  operationId: string;
+  /** 应用主机读取的冻结配置；实际执行仍由目标工作区 Host 校验模型。 */
+  request: PromptEnhancementInput;
+}
+
+export interface ZCodeAgentCancelPromptEnhancementParams extends ZCodeAgentWorkspaceTarget {
+  operationId: string;
 }
 
 export interface ZCodeAgentTestModelConnectivityParams extends ZCodeAgentWorkspaceTarget {
@@ -851,6 +862,8 @@ export interface IZCodeAgentService {
   generateWorkspaceText(
     params: ZCodeAgentGenerateWorkspaceTextParams,
   ): Promise<ZCodeWorkspaceGenerateTextResult>;
+  enhancePrompt(params: ZCodeAgentEnhancePromptParams): Promise<ZCodeWorkspaceGenerateTextResult>;
+  cancelPromptEnhancement(params: ZCodeAgentCancelPromptEnhancementParams): Promise<boolean>;
   testModelConnectivity(
     params: ZCodeAgentTestModelConnectivityParams,
   ): Promise<ZCodeProviderTestModelConnectivityResult>;

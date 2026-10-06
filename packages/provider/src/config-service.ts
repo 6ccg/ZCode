@@ -36,6 +36,7 @@ export interface ProviderConfigLayerSnapshot {
   readonly defaultModelSelection?: ModelSelection;
   readonly modelCatalogs?: ModelCatalogs;
   readonly auxiliaryModelSelection?: ModelSelection;
+  readonly promptEnhancementModelSelection?: ModelSelection;
 }
 
 export interface ProviderConfigLayerUpdate {
@@ -46,6 +47,7 @@ export interface ProviderConfigLayerUpdate {
   readonly defaultModelSelection?: ModelSelection;
   readonly modelCatalogs?: ModelCatalogs;
   readonly auxiliaryModelSelection?: ModelSelection;
+  readonly promptEnhancementModelSelection?: ModelSelection;
 }
 
 export interface PersonalProviderConfigRepository extends ProviderSource<ProviderConfigLayerSnapshot> {
@@ -139,6 +141,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       personalProviderOrder: personal.providerOrder ?? [],
       modelCatalogs: personal.modelCatalogs ?? {},
       auxiliaryModelSelection: personal.auxiliaryModelSelection,
+      promptEnhancementModelSelection: personal.promptEnhancementModelSelection,
     });
   }
 
@@ -374,6 +377,15 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
     selection: ModelSelection | undefined,
   ): Promise<ProviderConfigLayerSnapshot> {
     return this.#updatePersonal((current) => ({ ...current, auxiliaryModelSelection: selection }));
+  }
+
+  savePromptEnhancementModelSelection(
+    selection: ModelSelection | undefined,
+  ): Promise<ProviderConfigLayerSnapshot> {
+    return this.#updatePersonal((current) => ({
+      ...current,
+      promptEnhancementModelSelection: selection,
+    }));
   }
 
   async detachCatalogModel(
@@ -709,6 +721,7 @@ export class ProviderConfigService implements ProviderSource<ProviderConfigSnaps
       defaultModelSelection: current.defaultModelSelection,
       modelCatalogs: current.modelCatalogs,
       auxiliaryModelSelection: current.auxiliaryModelSelection,
+      promptEnhancementModelSelection: current.promptEnhancementModelSelection,
       ...transform(current),
     }));
   }
