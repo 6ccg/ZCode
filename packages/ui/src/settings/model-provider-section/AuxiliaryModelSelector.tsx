@@ -10,18 +10,38 @@ import {
 } from "@/components/ui/select.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
 import { encodeCustomModelValue, decodeCustomModelValue } from "@/lib/zcodeCustomModelValue.js";
+import { isExecutableTextModelSelection } from "@/lib/modelProviderAvailability.js";
 
 export function AuxiliaryModelSelector({
   view,
   onSave,
+  purpose = "auxiliary",
 }: {
   view: ProviderSettingsView;
   onSave: (selection: ModelSelection | null) => Promise<void>;
+  purpose?: "auxiliary" | "enhancement";
 }) {
   const { intl } = useZCodeIntl();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const selected = view.auxiliaryModelSelection;
+  const selected =
+    purpose === "enhancement" ? view.promptEnhancementModelSelection : view.auxiliaryModelSelection;
+  const labels =
+    purpose === "enhancement"
+      ? {
+          title: "settings.promptEnhancement.modelTitle",
+          description: "settings.promptEnhancement.modelDescription",
+          follow: "settings.promptEnhancement.modelFollow",
+          reasoning: "settings.promptEnhancement.modelReasoning",
+          unavailable: "settings.promptEnhancement.modelUnavailable",
+        }
+      : {
+          title: "settings.modelProvider.auxiliaryTitle",
+          description: "settings.modelProvider.auxiliaryDescription",
+          follow: "settings.modelProvider.auxiliaryFollow",
+          reasoning: "settings.modelProvider.auxiliaryReasoning",
+          unavailable: "settings.modelProvider.auxiliaryUnavailable",
+        };
   const groups = useMemo(
     () =>
       view.providers
@@ -48,12 +68,8 @@ export function AuxiliaryModelSelector({
         ?.models.find((m) => m.modelId === selected.modelId && m.selectable)
     : undefined;
   const levels = currentModel?.effectiveConfig.optionSpecs?.reasoningLevel?.values ?? [];
-  const valid =
-    !selected ||
-    (currentModel &&
-      selected.options?.reasoningLevel &&
-      levels.includes(selected.options.reasoningLevel));
-  const followLabel = intl.formatMessage({ id: "settings.modelProvider.auxiliaryFollow" });
+  const valid = !selected || isExecutableTextModelSelection(view, selected);
+  const followLabel = intl.formatMessage({ id: labels.follow });
   const save = async (selection: ModelSelection | null) => {
     setSaving(true);
     setError(null);
@@ -67,11 +83,9 @@ export function AuxiliaryModelSelector({
   };
   return (
     <div className="space-y-2 rounded-lg border border-border bg-card p-4">
-      <div className="text-ui-base font-medium">
-        {intl.formatMessage({ id: "settings.modelProvider.auxiliaryTitle" })}
-      </div>
+      <div className="text-ui-base font-medium">{intl.formatMessage({ id: labels.title })}</div>
       <p className="text-ui-sm text-foreground-subtle">
-        {intl.formatMessage({ id: "settings.modelProvider.auxiliaryDescription" })}
+        {intl.formatMessage({ id: labels.description })}
       </p>
       <div className="flex items-center gap-3">
         <ModelConfigSelect
@@ -85,7 +99,9 @@ export function AuxiliaryModelSelector({
           isItemLocked={() => false}
           disabled={saving}
           labelVisibilityClassName="inline-flex"
-          triggerTestId="auxiliary-model-select"
+          triggerTestId={
+            purpose === "enhancement" ? "enhancement-model-select" : "auxiliary-model-select"
+          }
           leadingItems={[{ key: "follow", value: "follow", name: followLabel }]}
           onValueChange={(value) => {
             if (value === "follow") {
@@ -120,8 +136,12 @@ export function AuxiliaryModelSelector({
           >
             <SelectTrigger
               className="w-40"
-              data-testid="auxiliary-reasoning-select"
-              aria-label={intl.formatMessage({ id: "settings.modelProvider.auxiliaryReasoning" })}
+              data-testid={
+                purpose === "enhancement"
+                  ? "enhancement-reasoning-select"
+                  : "auxiliary-reasoning-select"
+              }
+              aria-label={intl.formatMessage({ id: labels.reasoning })}
             >
               <SelectValue />
             </SelectTrigger>
@@ -137,7 +157,7 @@ export function AuxiliaryModelSelector({
       </div>
       {error || !valid ? (
         <p role="alert" className="text-ui-sm text-destructive">
-          {error ?? intl.formatMessage({ id: "settings.modelProvider.auxiliaryUnavailable" })}
+          {error ?? intl.formatMessage({ id: labels.unavailable })}
         </p>
       ) : null}
     </div>

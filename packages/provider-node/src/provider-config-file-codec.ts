@@ -38,6 +38,7 @@ const storedProviderConfigSchema = z
         defaultModelSelection: modelSelectionSchema.optional(),
         modelCatalogs: modelCatalogsSchema.default({}),
         auxiliaryModelSelection: modelSelectionSchema.optional(),
+        promptEnhancementModelSelection: modelSelectionSchema.optional(),
       })
       .strict(),
   })
@@ -91,6 +92,7 @@ export function decodeProviderConfigFile(input: unknown): ProviderConfigLayerUpd
     providerOrder: parsed.config.providerOrder,
     modelCatalogs: parsed.config.modelCatalogs,
     auxiliaryModelSelection: parsed.config.auxiliaryModelSelection,
+    promptEnhancementModelSelection: parsed.config.promptEnhancementModelSelection,
     ...(parsed.config.defaultModelSelection === undefined
       ? {}
       : { defaultModelSelection: parsed.config.defaultModelSelection }),
@@ -136,6 +138,9 @@ export function encodeProviderConfigFile(update: ProviderConfigLayerUpdate) {
       ...(update.auxiliaryModelSelection === undefined
         ? {}
         : { auxiliaryModelSelection: update.auxiliaryModelSelection }),
+      ...(update.promptEnhancementModelSelection === undefined
+        ? {}
+        : { promptEnhancementModelSelection: update.promptEnhancementModelSelection }),
       ...(update.defaultModelSelection === undefined
         ? {}
         : { defaultModelSelection: update.defaultModelSelection }),
