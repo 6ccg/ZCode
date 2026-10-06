@@ -53,6 +53,7 @@ export interface ProviderSettingsMutationTarget {
   refreshModelCatalog?(providerId: ProviderId): Promise<unknown>;
   detachCatalogModel?(providerId: ProviderId, modelId: ModelId): Promise<unknown>;
   saveAuxiliaryModelSelection?(selection: ModelSelection | undefined): Promise<unknown>;
+  savePromptEnhancementModelSelection?(selection: ModelSelection | undefined): Promise<unknown>;
   createPersonalProvider(input?: {
     readonly catalogSource?: "modellink";
     readonly templateId?: ProviderTemplateId;
@@ -180,6 +181,7 @@ export interface ProviderSettingsTemplateView {
 
 export interface ProviderSettingsView {
   readonly auxiliaryModelSelection?: ModelSelection;
+  readonly promptEnhancementModelSelection?: ModelSelection;
   readonly revision: number;
   readonly providerTemplates: readonly ProviderSettingsTemplateView[];
   readonly providerOrder: readonly ProviderId[];
@@ -237,6 +239,7 @@ export class ProviderSettingsFacade {
       accountStates: snapshot.account.states,
       modelCatalogs: snapshot.config.modelCatalogs,
       auxiliaryModelSelection: snapshot.config.auxiliaryModelSelection,
+      promptEnhancementModelSelection: snapshot.config.promptEnhancementModelSelection,
     });
   }
 
@@ -362,20 +365,35 @@ export class ProviderSettingsFacade {
   saveAuxiliaryModelSelection(selection: ModelSelection | null): Promise<ProviderSettingsView> {
     return this.#mutate("auxiliary-model", (target) => {
       if (!target.saveAuxiliaryModelSelection) throw new Error("当前 Host 不支持辅助模型设置");
-      if (selection) {
-        const model = this.#source
-          .getView()
-          .providers.find((p) => p.providerId === selection.providerId)
-          ?.models.find((m) => m.modelId === selection.modelId);
-        if (
-          !model ||
-          !selection.options?.reasoningLevel ||
-          !model.config.optionSpecs.reasoningLevel.values.includes(selection.options.reasoningLevel)
-        )
-          throw new Error("辅助模型或思维档位不可用，请重新选择");
-      }
+      this.#assertTextModelSelection(selection);
       return target.saveAuxiliaryModelSelection(selection ?? undefined);
     });
+  }
+
+  savePromptEnhancementModelSelection(
+    selection: ModelSelection | null,
+  ): Promise<ProviderSettingsView> {
+    return this.#mutate("prompt-enhancement-model", (target) => {
+      if (!target.savePromptEnhancementModelSelection)
+        throw new Error("当前 Host 不支持提示词增强模型设置");
+      this.#assertTextModelSelection(selection);
+      return target.savePromptEnhancementModelSelection(selection ?? undefined);
+    });
+  }
+
+  #assertTextModelSelection(selection: ModelSelection | null): void {
+    if (!selection) return;
+    const model = this.#source
+      .getView()
+      .providers.find((provider) => provider.providerId === selection.providerId)
+      ?.models.find((candidate) => candidate.modelId === selection.modelId);
+    if (
+      !model ||
+      !selection.options?.reasoningLevel ||
+      !model.config.optionSpecs.reasoningLevel.values.includes(selection.options.reasoningLevel)
+    ) {
+      throw new Error("辅助模型或思维档位不可用，请重新选择");
+    }
   }
 
   deletePersonalProvider(providerId: ProviderId): Promise<ProviderSettingsView> {
@@ -649,6 +667,7 @@ function requireEffectiveProvider(
 function createProviderSettingsView(input: {
   modelCatalogs?: ModelCatalogs;
   auxiliaryModelSelection?: ModelSelection;
+  promptEnhancementModelSelection?: ModelSelection;
   revision: number;
   zcodeBuiltinProviders: ProviderRegistryServiceSnapshot["config"]["zcodeBuiltinProviders"];
   zcodeBuiltinProviderTemplates: ProviderRegistryServiceSnapshot["config"]["zcodeBuiltinProviderTemplates"];
@@ -725,6 +744,7 @@ function createProviderSettingsView(input: {
   return Object.freeze({
     revision: input.revision,
     auxiliaryModelSelection: input.auxiliaryModelSelection,
+    promptEnhancementModelSelection: input.promptEnhancementModelSelection,
     providerTemplates: Object.freeze(
       (input.zcodeBuiltinProviderTemplates ?? ProviderTemplateMap.empty())
         .entries()
