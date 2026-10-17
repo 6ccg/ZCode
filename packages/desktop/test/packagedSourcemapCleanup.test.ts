@@ -1,4 +1,5 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -7,8 +8,27 @@ import {
   stripSourceMappingUrlComments,
   stripSourceMappingUrlCommentsInDirectory,
 } from "../scripts/packaged-sourcemap-cleanup.mjs";
+import { copyGenUiRuntimeAssets } from "../scripts/gen-ui-runtime-assets.mjs";
 
 describe("packaged sourcemap cleanup", () => {
+  it("清理后应保留离线可视化依赖的固定摘要", async () => {
+    const rootDir = mkdtempSync(resolve(tmpdir(), "zcode-pinned-vendor-test-"));
+    try {
+      await copyGenUiRuntimeAssets(rootDir);
+      stripSourceMappingUrlCommentsInDirectory(rootDir);
+      removeSourceMapFilesInDirectory(rootDir);
+      const manifest = JSON.parse(readFileSync(resolve(rootDir, "vendor/manifest.json"), "utf8"));
+      for (const resource of manifest.resources) {
+        const bytes = readFileSync(resolve(rootDir, "vendor", resource.file));
+        expect(createHash("sha256").update(bytes).digest("hex"), resource.file).toBe(
+          resource.sha256,
+        );
+      }
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+
   it("应删除 JS/CSS 里的 sourceMappingURL 注释但保留普通内容", () => {
     expect(
       stripSourceMappingUrlComments(

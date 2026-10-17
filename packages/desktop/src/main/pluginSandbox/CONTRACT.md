@@ -27,6 +27,8 @@ Gen UI 的 CSS/inner kit 使用 Visualize 插件的同一份固定资源，构�
 
 离线依赖继续由 `assets/vendor/manifest.json` 记录固定 npm 版本、包完整性、脚本及许可文件哈希。更新时核对包完整性、提取声明的分发文件和许可证，再更新哈希；Desktop 与独立导出共用这些文件，导出脚本将其嵌入为 data URL。验收覆盖复制资源的哈希、各打包清单路径存在性与许可入口可解析性；交互和会话状态契约不变。
 
+打包后的 source map 清理不得重写 `vendor/manifest.json` 声明的固定摘要脚本；保留原始脚本字节及其中的 source map 引用注释，仍不分发 `.map` 文件。最终包中的脚本和许可文件必须继续通过清单摘要校验，独立导出沿用同一份资源。
+
 Host preload enables state-preserving atomic moves only for explicitly marked sandbox webviews. The hook is installed before Electron registers its custom element; ordinary detach/disposal and unmarked webviews retain their original behavior. Main copy-image IPC validates sender owner, sandboxId/initId and bounded content/viewport geometry before and after native capture, crops using the actual image scale, and writes the native clipboard. It exposes neither arbitrary guest IDs nor image bytes to untrusted page code.
 
 `contentKind: "gen-ui"` 由桌面 Host 签发独立凭证，不要求 pluginId/serverName，也不能携带原生权限。使用内存分区 `gen-ui-<appIdentity>`；跨重开恢复依赖 Gen UI 服务，不依赖浏览器存储。HTML 外壳包含先于作者脚本执行的已转义状态快照与专用 `gen-ui.js`，不注入旧兼容桥。连接、子框架和表单提交禁用，静态资源限制为 Gen UI 固定域。其余 owner、guest、端口、手势和撤销机制复用本契约。

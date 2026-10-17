@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { extname, resolve } from "node:path";
+import { basename, dirname, extname, resolve } from "node:path";
 
 const SOURCEMAP_REFERENCE_EXTENSIONS = new Set([".js", ".cjs", ".mjs", ".css"]);
 // 只清理位于行首的 sourceMappingURL 注释。压缩后的 bundle 可能在模板字符串里内嵌
@@ -54,6 +54,23 @@ export function stripSourceMappingUrlCommentsInDirectory(rootDir) {
     const referencesRemoved = lineReferenceCount + blockReferenceCount;
     if (referencesRemoved === 0) {
       return;
+    }
+
+    // 离线导出按 vendor 清单核对原始脚本摘要；删除引用注释也会让 Lucide 等资源失效。
+    // 固定摘要资源保留原始字节，实际的 .map 文件仍由后续步骤删除。
+    const assetDirectory = dirname(filePath);
+    const manifestPath = resolve(assetDirectory, "manifest.json");
+    if (basename(assetDirectory) === "vendor" && existsSync(manifestPath)) {
+      const { resources } = JSON.parse(readFileSync(manifestPath, "utf8"));
+      if (
+        Array.isArray(resources) &&
+        resources.some(
+          (resource) =>
+            resource.file === basename(filePath) && /^[a-f0-9]{64}$/.test(resource.sha256),
+        )
+      ) {
+        return;
+      }
     }
 
     writeFileSync(filePath, stripSourceMappingUrlComments(source));

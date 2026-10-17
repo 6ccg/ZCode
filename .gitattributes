@@ -14,3 +14,6 @@ third-party/runtime/*.txt -text -whitespace
 docs/knip/docs/LICENSE -text -whitespace
 docs/knip/docs/licenses/** -text -whitespace
 third-party/inventory.json linguist-generated=true
+
+# 可视化离线依赖按 manifest 校验原始字节，Windows 检出时也不能转换换行。
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/vendor/* -text
