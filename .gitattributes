@@ -23,3 +23,9 @@ third-party/inventory.json linguist-generated=true
 
 # Gen UI vendor 快照带 sha256 清单，构建时逐字节校验；autocrlf 改写换行会误报漂移，按字节保真。
 apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/vendor/** -text
+
+# runtime-manifest 同样校验运行时源码字节，Windows 检出必须保持清单对应的 LF。
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/visualize.css text eol=lf
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/visualize.html text eol=lf
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/calendar.js text eol=lf
+packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.js text eol=lf

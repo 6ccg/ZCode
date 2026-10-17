@@ -26,7 +26,11 @@ Gen UI 的 CSS/inner kit 使用 Visualize 插件的同一份固定资源，构�
 
 资源完整性由 Visualize 的 `assets/runtime-manifest.json` 维护，结构仅为 `files → 文件名 → sha256`，记录当前 CSS、inner kit、calendar 和 Tweak 文件的 SHA-256。桌面资源测试核对实际复制字节与清单；Tweak 注释变更也需要同步哈希。资源名称变更须同时更新 Desktop、CLI SEA、远程预构建、服务端远程部署与插件 seed 校验入口；缺少清单或必需文件仍按现有规则失败，不回退到旧名称。插件的许可入口统一为 `skills/visualize/LICENSE.md`，保留许可限制与第三方依赖声明。
 
+`runtime-manifest.json` 中的 CSS、HTML、calendar 与 Tweak 源文件固定以 LF 检出，避免 Windows autocrlf 改变待打包字节；哈希校验不忽略换行差异，也不为平台差异改写清单。
+
 离线依赖继续由 `assets/vendor/manifest.json` 记录固定 npm 版本、包完整性、脚本及许可文件哈希。更新时核对包完整性、提取声明的分发文件和许可证，再更新哈希；Desktop 与独立导出共用这些文件，导出脚本将其嵌入为 data URL。验收覆盖复制资源的哈希、各打包清单路径存在性与许可入口可解析性；交互和会话状态契约不变。
+
+打包后的 source map 清理不得重写 `vendor/manifest.json` 声明的固定摘要脚本；保留原始脚本字节及其中的 source map 引用注释，仍不分发 `.map` 文件。最终包中的脚本和许可文件必须继续通过清单摘要校验，独立导出沿用同一份资源。
 
 Host preload enables state-preserving atomic moves only for explicitly marked sandbox webviews. The hook is installed before Electron registers its custom element; ordinary detach/disposal and unmarked webviews retain their original behavior. Main copy-image IPC validates sender owner, sandboxId/initId and bounded content/viewport geometry before and after native capture, crops using the actual image scale, and writes the native clipboard. It exposes neither arbitrary guest IDs nor image bytes to untrusted page code.
 
