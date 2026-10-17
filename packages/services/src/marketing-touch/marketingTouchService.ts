@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { parseMarketingTouchResponse, type ApiClient } from "@zcode/shared";
+import {
+  parseMarketingTouchResponse,
+  ZCODE_MARKETING_TOUCH_ENABLED,
+  type ApiClient,
+} from "@zcode/shared";
 import { readApiJson } from "#src/providers/api/apiJson.js";
 import type { IMarketingTouchService } from "#src/marketing-touch/marketingTouch.js";
 
@@ -43,6 +47,10 @@ export function createMarketingTouchService(options: {
   }
   return {
     async query({ locale }) {
+      // 只停 UI 会遗漏旧调用者；产品策略必须在读取身份和发送请求前收口。
+      if (!ZCODE_MARKETING_TOUCH_ENABLED) {
+        return { serverTime: 0, language: locale, deliveries: [], rejectedCount: 0, scope };
+      }
       const identity = await context(locale);
       const url = new URL("/api/v1/marketing/touch", options.baseUrl);
       url.searchParams.set("seq", String(bootRequestSeq++));
@@ -59,6 +67,7 @@ export function createMarketingTouchService(options: {
       return { ...snapshot, scope: identity.scope };
     },
     async report(input) {
+      if (!ZCODE_MARKETING_TOUCH_ENABLED) return;
       const parsed = reportSchema.parse(input);
       const identity = await context(parsed.locale);
       // 领取期间账号可能已切换；禁止把旧操作用新凭据上报，也不向 UI 暴露凭据。
