@@ -1,5 +1,7 @@
 # Marketing Touch 客户端接入
 
+当前修改版通过固定产品策略关闭营销查询、上报及 UI 运行时，规则见 [修改版关闭营销触达](../specs/modified-marketing-touch.md)。下文保留上游能力的实现说明。
+
 ## Banner hover 桥接（2026-09-15）
 
 Banner iframe 保留 pointer-events:none、inert、不可聚焦及忽略包内 action。App Banner 是 hover 唯一 owner：鼠标移入/移出整块 Banner，经已有 `zcode-cloud-hero-v1` 发送 `{type:"hover",instanceId,hovered:boolean}`；不发送坐标、点击或业务事件，不改服务端投放字段。

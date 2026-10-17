@@ -1,5 +1,53 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMarketingTouchService } from "#src/marketing-touch/marketingTouchService.js";
+
+const policy = vi.hoisted(() => ({ enabled: true }));
+vi.mock("@zcode/shared", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@zcode/shared")>()),
+  get ZCODE_MARKETING_TOUCH_ENABLED() {
+    return policy.enabled;
+  },
+}));
+afterEach(() => {
+  policy.enabled = true;
+});
+
+it.each([null, "signed-in-token"])(
+  "disabled marketing performs no identity or network IO (token=%s)",
+  async (token) => {
+    policy.enabled = false;
+    const request = vi.fn();
+    const getToken = vi.fn(async () => token);
+    const getDeviceMid = vi.fn();
+    const onSnapshot = vi.fn();
+    const service = createMarketingTouchService({
+      apiClient: { request },
+      getToken,
+      getDeviceMid,
+      onSnapshot,
+      baseUrl: "https://example.invalid",
+      appVersion: "3.15.1",
+    });
+    const snapshot = await service.query({ locale: "zh-CN" });
+    expect(snapshot).toEqual({
+      serverTime: 0,
+      language: "zh-CN",
+      deliveries: [],
+      rejectedCount: 0,
+      scope: expect.any(String),
+    });
+    await service.report({
+      locale: "zh-CN",
+      scope: snapshot.scope,
+      campaignId: "old-campaign",
+      actionType: "confirm",
+    });
+    expect(request).not.toHaveBeenCalled();
+    expect(getToken).not.toHaveBeenCalled();
+    expect(getDeviceMid).not.toHaveBeenCalled();
+    expect(onSnapshot).not.toHaveBeenCalled();
+  },
+);
 
 function fixture(createService = createMarketingTouchService) {
   let token: string | null = "first-token";

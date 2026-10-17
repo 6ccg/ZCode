@@ -20,7 +20,11 @@ import {
   marketingSettingsSections,
   waitForMarketingCapability,
 } from "@/lib/marketingNavigation.js";
-import { BUILTIN_MODEL_PROVIDER_IDS, ZCODE_ENV } from "@zcode/shared";
+import {
+  BUILTIN_MODEL_PROVIDER_IDS,
+  ZCODE_ENV,
+  ZCODE_MARKETING_TOUCH_ENABLED,
+} from "@zcode/shared";
 import { useServices } from "@/hooks/useServices.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
 import { useZCodeStore } from "@/store/StoreProvider.js";
@@ -52,13 +56,21 @@ const Context = createContext<MarketingTouchController | null>(null);
 // 导出给左下角活动仲裁层（SidebarBottomActivity）读取 Banner 可见性；控制器仍是唯一 owner。
 export { Context as MarketingTouchContext };
 
-export function MarketingTouchProvider({
-  children,
-  desktop,
-}: {
+type MarketingTouchProviderProps = {
   children: ReactNode;
   desktop: boolean;
-}) {
+};
+
+export function MarketingTouchProvider(props: MarketingTouchProviderProps) {
+  // 停用时不挂载营销 hooks，避免留下轮询、监听和素材预加载。
+  return ZCODE_MARKETING_TOUCH_ENABLED ? (
+    <EnabledMarketingTouchProvider {...props} />
+  ) : (
+    <>{props.children}</>
+  );
+}
+
+function EnabledMarketingTouchProvider({ children, desktop }: MarketingTouchProviderProps) {
   const services = useServices();
   const platform = usePlatform();
   const openSettingsTab = useTabStore((state) => state.openSettingsTab);

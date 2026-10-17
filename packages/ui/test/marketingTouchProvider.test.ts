@@ -15,6 +15,7 @@ const h = vi.hoisted(() => {
   };
   const tabs = { openSettingsTab: vi.fn(), activeWorkspacePath: "/fixture" };
   return {
+    marketingEnabled: true,
     services,
     tabs,
     tabApi: { getState: () => tabs },
@@ -25,6 +26,12 @@ const h = vi.hoisted(() => {
     rewards: vi.fn().mockResolvedValue(undefined),
   };
 });
+vi.mock("@zcode/shared", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@zcode/shared")>()),
+  get ZCODE_MARKETING_TOUCH_ENABLED() {
+    return h.marketingEnabled;
+  },
+}));
 vi.mock("@/hooks/useProviderSettingsView.js", () => ({
   useProviderSettingsView: () => ({
     state: {
@@ -124,8 +131,35 @@ it.each([true, false])("任务完成请求复用窗口 poller（desktop=%s）", 
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
+  h.marketingEnabled = true;
   vi.clearAllMocks();
 });
+
+it.each([true, false])(
+  "停用营销后启动、切回、联网和任务完成均不触发请求（desktop=%s）",
+  async (desktop) => {
+    h.marketingEnabled = false;
+    vi.useFakeTimers();
+    render(
+      createElement(MarketingTouchProvider, {
+        desktop,
+        children: createElement(TaskCompletionProbe),
+      }),
+    );
+    expect(screen.getByText("Task completed")).toBeTruthy();
+    fireEvent.click(screen.getByText("Task completed"));
+    fireEvent(document, new Event("visibilitychange"));
+    fireEvent(window, new Event("online"));
+    await act(async () => {
+      vi.advanceTimersByTime(30 * 60_000);
+    });
+    expect(h.services.marketingTouchService.query).not.toHaveBeenCalled();
+    expect(h.services.marketingTouchService.report).not.toHaveBeenCalled();
+    expect(h.services.usageStatsService.getEntitlementSnapshot).not.toHaveBeenCalled();
+    expect(screen.queryByText("Claim")).toBeNull();
+  },
+);
 
 it("rewards 导航委托窗口 Provider，保留一次 confirm 上报且不领取", async () => {
   h.services.marketingTouchService.query.mockResolvedValue({
