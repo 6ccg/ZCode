@@ -2146,7 +2146,9 @@ export function SettingsPage({
                               isDesktop={Boolean(isDesktop)}
                             />
                           ) : activeSection === "builtinPrompts" ? (
-                            <BuiltinPromptsSection navigationGuardRef={builtinPromptNavigationGuard} />
+                            <BuiltinPromptsSection
+                              navigationGuardRef={builtinPromptNavigationGuard}
+                            />
                           ) : activeSection === "promptEnhancement" ? (
                             <PromptEnhancementSection
                               key={`prompt-enhancement:${settingsSectionNavigationVersion}`}
