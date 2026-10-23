@@ -114,8 +114,9 @@ test("missing catalog limits inherit defaults and old null snapshots are normali
       available.map((item) => item.modelId),
       ["unknown-limits", "known-limits"],
     );
-    assert.equal(available[0]!.config.optionSpecs.maxOutputTokens.max, 32000);
-    assert.equal(available[0]!.config.properties.contextWindow, 200000);
+    // 上游 v3.16.2 已调整通用推荐值；目录缺失仍应继承当前随包规则。
+    assert.equal(available[0]!.config.optionSpecs.maxOutputTokens.max, 128000);
+    assert.equal(available[0]!.config.properties.contextWindow, 1000000);
     assert.equal(available[1]!.config.optionSpecs.maxOutputTokens.max, 4096);
 
     runtime.dispose();

@@ -2138,7 +2138,9 @@ export function SettingsPage({
                               />
                             </ServiceProvider>
                           ) : activeSection === "builtinPrompts" ? (
-                            <BuiltinPromptsSection navigationGuardRef={builtinPromptNavigationGuard} />
+                            <BuiltinPromptsSection
+                              navigationGuardRef={builtinPromptNavigationGuard}
+                            />
                           ) : activeSection === "promptEnhancement" ? (
                             <PromptEnhancementSection
                               key={`prompt-enhancement:${settingsSectionNavigationVersion}`}
