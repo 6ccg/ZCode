@@ -1,8 +1,15 @@
 import { renderBuiltinPrompt, type BuiltinPromptOverrides } from "@zcode/shared/builtin-prompts";
 
-export function buildCompactPrompt(customInstructions: string | undefined, overrides?: BuiltinPromptOverrides): string {
-  const customInstructionBlock = customInstructions?.trim() ? `\n\nAdditional Instructions:\n${customInstructions}` : "";
-  return renderBuiltinPrompt("auxiliary.compact", overrides, {custom_instructions: customInstructionBlock});
+export function buildCompactPrompt(
+  customInstructions: string | undefined,
+  overrides?: BuiltinPromptOverrides,
+): string {
+  const customInstructionBlock = customInstructions?.trim()
+    ? `\n\nAdditional Instructions:\n${customInstructions}`
+    : "";
+  return renderBuiltinPrompt("auxiliary.compact", overrides, {
+    custom_instructions: customInstructionBlock,
+  });
 }
 
 export function formatCompactSummary(text: string | undefined): string {

@@ -12,7 +12,12 @@ const DEFAULT_AGENT_IDENTITY =
 const OUTPUT_STYLE_AGENT_IDENTITY =
   'You are an interactive agent that helps users according to your "Output Style", which describes how you should respond to user queries.';
 
-import { SECURITY_NOTICE, buildBuiltinHarnessBlock, renderBuiltinPrompt, type BuiltinPromptOverrides } from "@zcode/shared/builtin-prompts";
+import {
+  SECURITY_NOTICE,
+  buildBuiltinHarnessBlock,
+  renderBuiltinPrompt,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
 
 /** 安全 IMPORTANT 行：交互式身份与工作流子代理身份共用，逐字同一份。 */
 export function buildSecurityNotice(): string {

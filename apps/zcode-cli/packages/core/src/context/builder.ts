@@ -119,7 +119,13 @@ export class ContextBuilder {
     } else if (workflowActor !== undefined) {
       sections.push(buildWorkflowActorIdentitySection(workflowActor, midConversationSystem));
     } else {
-      sections.push(buildIdentitySection(activeOutputStyle, midConversationSystem, this.config.builtinPromptOverrides));
+      sections.push(
+        buildIdentitySection(
+          activeOutputStyle,
+          midConversationSystem,
+          this.config.builtinPromptOverrides,
+        ),
+      );
     }
 
     // 环境与模型是运行时公告（meta_user），不进 system；使用自定义 prompt 时也照常发送。

@@ -24,23 +24,23 @@ import { buildGeneralPurposeSystemPrompt } from "../../../apps/zcode-cli/package
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 
 test("default templates preserve upstream text and its conditional variants", () => {
-  // 在移动文案前从基线实现采集摘要，防止重构时丢失换行、条件分支或插值。
+  // 摘要直接从官方 v3.17.1 (a60ba6a7) 采集，防止 rebase 保留旧默认或丢失条件分支。
   const cases: Array<[string, string]> = [
     [
       buildCliPrefixSection().content,
-      "46dd360a22c87a92dfdf29ae2c3011b0f9a014209a7b607f8fcd17a920e5eafa",
+      "7779642ea44a46963bcdc9c151aa95d4761f17182929e41cb5bff571110af440",
     ],
     [
       buildDynamicBehaviorSection().content,
-      "bbdc66b399d297fff35df404921dcbd9056ed8892cd0fa6f35762345115225af",
+      "7d843753f3adae93ecc51e6fa2cb9b07bdc0c4b946bc3d2404f0a6db596bf5d0",
     ],
     [
       buildContextManagementSection().content,
-      "1732b7f098a925d7cee667d6aa722d3ff6aaf83cda240dc43ad4f98503c142bb",
+      "406a0480d88086cdbb9eadbbcd63c4a95d370d4a89c20b753a4d96da90458b11",
     ],
     [
       buildSessionGuidanceSection(["Skill"], true)!.content,
-      "e25def8de220f128c6feb186b283696246ffa34f6385b74de4307bd4d50a3f00",
+      "6596a0131800c7792ce18e69cca60663537c8461198819dc3935946878553287",
     ],
     [
       buildDesktopContextSection().content,
@@ -48,7 +48,7 @@ test("default templates preserve upstream text and its conditional variants", ()
     ],
     [
       buildMemorySection("/memory", "default-index")!.content,
-      "81f6809062b53eb666b53e312b56c415a87ab111e9c9c9ad9be66cc308f67072",
+      "1276dfda7bb5ebfdba02566f25bfa1d3d238f5453a9a13f9795e370e824c811a",
     ],
     [
       buildDesktopContextSection("/visuals").content,
@@ -56,7 +56,7 @@ test("default templates preserve upstream text and its conditional variants", ()
     ],
     [
       buildMemorySection("/memory", "semantic-recall")!.content,
-      "3b932c7864917b589f591e8740ed61821dcdbbbdfdc2198165bc405a58d6b6fa",
+      "6c5403c8959ca87b5ef6de8a366627ce6aab25f0b54b3bd637feb8dc4eb280d9",
     ],
     [
       buildGeneralPurposeSystemPrompt(),
@@ -64,11 +64,11 @@ test("default templates preserve upstream text and its conditional variants", ()
     ],
     [
       buildIdentitySection().content,
-      "3f21ff9a88a03a76cc765f1aa01eb6e9d645c5f44a0c80acf923b11bf2a7b92b",
+      "aac4ba4cc7b555b3a32704850028e242a6e3045df91d7970f04d18c378e57f40",
     ],
     [
       buildIdentitySection({ name: "test", prompt: "test" }).content,
-      "ab991b9062e1b4e13281edfa503d3c83b5cc6d0806dff17cdc671dba78686d2e",
+      "b0df630cb67348a9824ec4402a992c72a5c17f58c0b18f4235e297ea294f7fb7",
     ],
     [
       buildExploreAgentPrompt({}),
@@ -80,11 +80,11 @@ test("default templates preserve upstream text and its conditional variants", ()
     ],
     [
       buildCompactPrompt(undefined),
-      "55bf8287d1f1e9d1130d32718432cbfab61ec0e47812e1a5cfd1736eb924f64f",
+      "63e2bfb4ded280d5057a66d8a034ef352a73960d97d955b990e78f04f0db1fb0",
     ],
     [
       buildCompactPrompt("Keep tests"),
-      "5df7018b3bd452328e60ed5f1a79bc21233171d3cad617317ea4ab5945068563",
+      "9d491630cbebc8da5b82d9d7d631b2e8bee9d8803ff3872dea84db589d6fb589",
     ],
     [
       buildMemoryExtractionPrompt({ messageCount: 5, manifest: [] }),
@@ -100,6 +100,15 @@ test("default templates preserve upstream text and its conditional variants", ()
     ],
   ];
   for (const [text, expected] of cases) assert.equal(hash(text), expected);
+  assert.equal(
+    hash(buildIdentitySection(undefined, false).content),
+    "00cdd3396071ffbf93bfb83c0d98923ba17564da7279617d68094d70fe1df5d7",
+  );
+  assert.equal(
+    buildIdentitySection(undefined, false, { "main.identity": "Custom {{identity_intro}}" })
+      .content,
+    "Custom You are an agent working with the user toward their goals, using your own judgment along the way.",
+  );
 });
 
 test("templates validate required variables and replace inserted data only once", () => {

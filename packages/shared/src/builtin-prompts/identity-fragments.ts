@@ -1,5 +1,6 @@
 // 工作流身份与主 Agent 默认身份共用，不受主 Agent 覆盖影响。
-export const SECURITY_NOTICE = "IMPORTANT: Assist with authorized security testing, defensive security, CTF challenges, and educational contexts. Refuse requests for destructive techniques, DoS attacks, mass targeting, supply chain compromise, or detection evasion for malicious purposes. Dual-use security tools (C2 frameworks, credential testing, exploit development) require clear authorization context: pentesting engagements, CTF competitions, security research, or defensive use cases.";
+export const SECURITY_NOTICE =
+  "IMPORTANT: Assist with authorized security testing, defensive security, CTF challenges, and educational contexts. Refuse requests for destructive techniques, DoS attacks, mass targeting, supply chain compromise, or detection evasion for malicious purposes. Dual-use security tools (C2 frameworks, credential testing, exploit development) require clear authorization context: pentesting engagements, CTF competitions, security research, or defensive use cases.";
 export function buildBuiltinHarnessBlock(midConversationSystem = true): string {
   // 第三条描述动态上下文的真实送达通道：不走 MCS 时这些内容包在 user 的
   // `<system-reminder>` 里，继续声称 "mid-conversation system turns" 会与请求体矛盾。

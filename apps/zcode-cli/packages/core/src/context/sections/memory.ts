@@ -14,7 +14,13 @@ export function buildMemorySection(
 ): ContextSection | null {
   if (!memoryRoot) return null;
 
-  const content = renderBuiltinPrompt("main.memory", overrides, { memory_root: memoryRoot, memory_index_instructions: retrievalBranch === "default-index" ? "\n\nAfter writing the file, add a one-line pointer in `MEMORY.md` (`- [Title](file.md) — hook`). `MEMORY.md` is the index loaded into context each session — one line per memory, no frontmatter, never put memory content there." : "" });
+  const content = renderBuiltinPrompt("main.memory", overrides, {
+    memory_root: memoryRoot,
+    memory_index_instructions:
+      retrievalBranch === "default-index"
+        ? "\n\nAfter writing the file, add a one-line pointer in `MEMORY.md` (`- [Title](file.md) — hook`). `MEMORY.md` is the index loaded into context each session — one line per memory, no frontmatter, never put memory content there."
+        : "",
+  });
 
   return {
     name: "Memory",
