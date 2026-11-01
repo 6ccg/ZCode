@@ -22,7 +22,8 @@ async function fixture() {
       env: {
         ...process.env,
         GIT_CONFIG_NOSYSTEM: "1",
-        GIT_CONFIG_GLOBAL: devNull,
+        // Git for Windows 不接受 Node 的 \\.\nul 设备路径，使用它支持的 NUL 名称。
+        GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : devNull,
         GIT_AUTHOR_NAME: "Test",
         GIT_AUTHOR_EMAIL: "test@example.com",
         GIT_COMMITTER_NAME: "Test",
