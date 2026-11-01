@@ -1198,6 +1198,49 @@ global:
   acceptedUpstreamSnapshot: scripts/architecture/upstream-snapshot.json
 
 exceptions:
+  - id: modified-model-catalog-existing-files
+    rule: unmanaged-new-file
+    paths:
+      - packages/provider/src/model-catalog.ts
+      - packages/provider-node/src/modellink-catalog-loader.ts
+      - apps/zcode-cli/packages/bootstrap/src/app/model-catalog-port.ts
+      - apps/zcode-cli/packages/contracts/src/interfaces/model-catalog.port.ts
+      - packages/ui/src/settings/model-provider-section/AuxiliaryModelSelector.tsx
+    reason: 用户要求将 fork 已有 ModelLink 与辅助模型修改 rebase 到 v3.17.1；这些文件已有于 fork，ProviderConfigService 仍为唯一配置所有者，接口见 specs/modellink-providers.md。本次精确准入现有路径，不扩大为整个未受管包。
+  - id: modified-builtin-prompts-existing-files
+    rule: unmanaged-new-file
+    paths:
+      - apps/zcode-cli/packages/adapters/src/context/builtin-prompts.ts
+      - packages/services/src/setting/builtinPromptWriter.ts
+      - packages/shared/src/builtin-prompts/auxiliary.ts
+      - packages/shared/src/builtin-prompts/identity-fragments.ts
+      - packages/shared/src/builtin-prompts/index.ts
+      - packages/shared/src/builtin-prompts/main.ts
+      - packages/shared/src/builtin-prompts/prompt-enhancement.ts
+      - packages/shared/src/builtin-prompts/subagents.ts
+      - packages/ui/src/hooks/useBuiltinPrompts.ts
+      - packages/ui/src/settings/BuiltinPromptsSection.tsx
+    reason: 保留 fork 已有提示词编辑功能；Shared 提供纯模板，SettingService 唯一写入，CLI adapter 只读快照，UI 通过 hook 访问。边界见 specs/builtin-prompt-editor.md；此次仅同步上游默认文案及现有调用接口，不接管整个包。
+  - id: modified-prompt-enhancement-existing-files
+    rule: unmanaged-new-file
+    paths:
+      - packages/services/src/zcode-agent/promptEnhancementGenerator.ts
+      - packages/shared/src/prompt-enhancement.ts
+      - packages/ui/src/hooks/usePromptEnhancement.ts
+      - packages/ui/src/prompt-editor/promptEnhancementEditor.ts
+      - packages/ui/src/settings/PromptEnhancementSection.tsx
+      - packages/ui/src/v4/composer/PromptEnhancementControls.tsx
+      - packages/ui/src/v4/composer/PromptEnhancementFeedback.tsx
+      - packages/ui/src/v4/composer/promptEnhancementContext.ts
+    reason: 保留 fork 已有提示词增强功能与 specs/prompt-enhancement.md 的所有者和取消顺序；服务复用现有模型请求，Composer 只持有草稿。新上游共享 Runtime 的释放逐个取消对应 workspace 的增强请求，不新增状态所有者或并行入口。
+  - id: modified-official-services-existing-gates
+    rule: unmanaged-new-file
+    paths:
+      - packages/ui/src/lib/officialPlanAvailability.ts
+      - packages/ui/src/lib/desktopUpdateMenu.ts
+      - packages/services/src/marketing-touch/marketingTouchService.ts
+      - packages/ui/src/components/marketing-touch/MarketingTouchProvider.tsx
+    reason: 保留 fork 已有官方套餐、自动更新和营销停用开关（specs/generic-model-channels.md、modified-desktop-updates.md、modified-marketing-touch.md）；这些修改只在既有边界提前返回，不增设外部调用或业务状态。
   - id: session-features-attribution-header-edit
     rule: unmanaged-new-file
     paths: [apps/zcode-cli/packages/adapters/src/model/runner-attribution.ts]
