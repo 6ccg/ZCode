@@ -8,7 +8,7 @@ import {
   ProviderConfigResolver,
   ProviderRegistry,
 } from "@zcode/provider";
-import { decodeProviderConfigFile } from "@zcode/provider-node";
+import { decodeProviderConfigFile, PERSONAL_PROVIDER_CONFIG_FILE_NAME } from "@zcode/provider-node";
 
 describe("custom OpenAI Provider E2E seed", () => {
   afterEach(() => {
@@ -35,8 +35,9 @@ describe("custom OpenAI Provider E2E seed", () => {
       inputModalities: ["text", "image"],
     });
 
+    // 修改版使用独立 v2 文件；从原版路径读取会漏掉播种结果。
     const personalConfig = JSON.parse(
-      await readFile(join(homeDir, ".zcode", "v2", "provider_config.json"), "utf-8"),
+      await readFile(join(homeDir, ".zcode", "v2", PERSONAL_PROVIDER_CONFIG_FILE_NAME), "utf-8"),
     ) as { config: { modelConfigRules: unknown } };
     const personal = decodeProviderConfigFile(personalConfig);
     const resolved = new ProviderConfigResolver().resolve({
@@ -55,7 +56,7 @@ describe("custom OpenAI Provider E2E seed", () => {
       }),
     ).toEqual({ ok: true });
     expect(personalConfig).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       config: {
         providerConfigRules: {
           providerRules: [

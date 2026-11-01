@@ -28,6 +28,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { PERSONAL_PROVIDER_CONFIG_FILE_NAME } from "@zcode/provider-node";
 import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import {
@@ -240,7 +241,11 @@ const E2E_STORAGE_ROOT = resolve(E2E_HOME_DIR, ".zcode");
 const E2E_APP_CONFIG_DIR = resolve(E2E_STORAGE_ROOT, "v2");
 const E2E_APP_SETTINGS_FILE = resolve(E2E_APP_CONFIG_DIR, "setting.json");
 const E2E_APP_CREDENTIALS_FILE = resolve(E2E_APP_CONFIG_DIR, "credentials.json");
-const E2E_APP_PROVIDER_CONFIG_FILE = resolve(E2E_APP_CONFIG_DIR, "provider_config.json");
+// 播种须与实际 Host 使用同一修改版文件，避免启动后模型配置缺失。
+const E2E_APP_PROVIDER_CONFIG_FILE = resolve(
+  E2E_APP_CONFIG_DIR,
+  PERSONAL_PROVIDER_CONFIG_FILE_NAME,
+);
 // staged Electron app 只有 main/host/renderer 产物，不携带仓库级 config/provider。
 // 若让 Host 依据 app.getAppPath() 推导 bundled config，重启后会把不存在的路径当作
 // bundled release，模型配置初始化直接失败。E2E 明确注入同一份只读基线；off-peak
@@ -4882,7 +4887,8 @@ export const config: WebdriverIO.Config = {
           ? "packages/desktop/test/e2e/helpers/storage-worker-diagnostics.mjs"
           : "packages/desktop/test/e2e/helpers/subagent-config-proxy.mjs",
       );
-      const preload = `--import=${JSON.stringify(proxy)}`;
+      // Windows 的盘符路径不是 ESM URL，预加载统一使用 file: URL。
+      const preload = `--import=${JSON.stringify(pathToFileURL(proxy).href)}`;
       const diagnostics = storageDiagnostics
         ? `process.env.ZCODE_E2E_STORAGE_WORKER_DIAGNOSTICS_DIR = ${JSON.stringify(resolve(e2eReporter.artifactDir, "storage-workers"))};\n`
         : "";
