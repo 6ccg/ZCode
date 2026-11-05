@@ -223,7 +223,7 @@ describe("ZCode plugins", () => {
     ).toEqual([OFFICIAL_BROWSER_USE_REQUIRED_SEED_PATHS.at(-1)]);
   });
 
-  it("can disable one document plugin without disabling the other formats or search", async () => {
+  it("can disable one document plugin without disabling other formats; official search remains opt-in", async () => {
     const root = await mkdtemp(join(tmpdir(), "zcode-document-toggle-"));
     try {
       const userConfigPath = join(root, "config.json");
@@ -240,8 +240,9 @@ describe("ZCode plugins", () => {
         workingDirectory: root,
       });
       expect(outcome.plugins.find((plugin) => plugin.name === "documents")?.enabled).toBe(false);
-      for (const name of ["pdf", "presentations", "spreadsheets", "image-search"])
+      for (const name of ["pdf", "presentations", "spreadsheets"])
         expect(outcome.plugins.find((plugin) => plugin.name === name)?.enabled).toBe(true);
+      expect(outcome.plugins.find((plugin) => plugin.name === "image-search")?.enabled).toBe(false);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

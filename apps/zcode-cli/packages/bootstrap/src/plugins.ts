@@ -44,6 +44,7 @@ import {
 } from "@zcode/adapters/plugins";
 import type {
   Logger,
+  OfficialMcpTrustedOriginRegistry,
   PluginHookDetail,
   PluginLoadOutcome,
   PluginMetadata,
@@ -73,6 +74,42 @@ export interface ResolveZCodePluginsOptions {
 }
 
 export interface ListZCodePluginsOptions extends ResolveZCodePluginsOptions {}
+
+export function guardOfficialPluginNetworkOrigins(
+  origins: OfficialMcpTrustedOriginRegistry,
+  options: ResolveZCodePluginsOptions,
+): OfficialMcpTrustedOriginRegistry {
+  return {
+    async isTrusted(request) {
+      // 官方 HTTP MCP 可以匿名回退，须在发请求前拒绝，而非仅扣留身份头。
+      if (!isOfficialNetworkPluginEnabled(request.pluginId, options)) {
+        return { trusted: false, detail: "official_plugin_disabled" };
+      }
+      return origins.isTrusted(request);
+    },
+  };
+}
+
+/** 每次出站读取既有插件配置；旧会话不能绕过用户刚关闭的官方联网插件。 */
+export function isOfficialNetworkPluginEnabled(
+  pluginId: string | undefined,
+  options: ResolveZCodePluginsOptions = {},
+): boolean {
+  const name = pluginId?.split("@")[0];
+  if (name !== "zcode-site" && name !== "image-search") return true;
+  const id = `${name}@${ZCODE_OFFICIAL_PLUGIN_MARKETPLACE}`;
+  if (pluginId !== name && pluginId !== id) return true;
+  try {
+    const { configResult } = resolvePluginContext(options);
+    return (
+      !configResult.config.plugins.suppressedBuiltins.includes(id) &&
+      configResult.config.plugins.enabledPlugins[id] === true
+    );
+  } catch {
+    // 配置损坏或不可读时不能退回默认联网，也不能借匿名请求发出正文。
+    return false;
+  }
+}
 
 export interface SetZCodePluginEnabledOptions extends ResolveZCodePluginsOptions {
   enabled: boolean;
