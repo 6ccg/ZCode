@@ -1,9 +1,10 @@
 /* 官方插件命令进程的代理端点（技术方案 5.8）：CLI 不持有凭证，端点按 session token 认出会话、
  * 只放行 Sites 接口、向 host 现取身份头后转发给 zcode-server。这里用真实的 UDS 和一个本地
  * 假 zcode-server 验证转发细节，凭证解析由 host 侧测试覆盖。 */
-import { stat } from "node:fs/promises";
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, request, type IncomingHttpHeaders, type Server } from "node:http";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { afterEach, assert, describe, expect, it, vi } from "vitest";
 import {
   ZCODE_OFFICIAL_ENDPOINT_ENV_KEY,
@@ -22,6 +23,7 @@ import {
   type OfficialCommandEndpoint,
 } from "../../src/official-command-endpoint/index.js";
 import { createOfficialCommandAuthHeadersPort } from "../../src/zcode-protocol/official-mcp-auth-port.js";
+import { isOfficialNetworkPluginEnabled } from "../../src/plugins.js";
 
 const IDENTITY = { Authorization: "Bearer zcode-jwt", "X-Bigmodel-Authorization": "Bearer maas" };
 const WORKSPACE_A = { workspacePath: "/w/a" };
@@ -138,6 +140,30 @@ describe("official command endpoint", () => {
       const dir = await stat(dirname(a[ZCODE_OFFICIAL_ENDPOINT_ENV_KEY]!));
       expect(dir.mode & 0o077).toBe(0);
     }
+  });
+
+  it("关闭 Sites 后旧 session token 也不能转发部署正文或获取身份", async () => {
+    const root = await mkdtemp(join(tmpdir(), "zcode-sites-privacy-"));
+    cleanups.push(() => rm(root, { recursive: true, force: true }));
+    const userConfigPath = join(root, "config.json");
+    const id = "zcode-site@zcode-plugins-official";
+    const identity = vi.fn(async () => ({ ok: true as const, headers: IDENTITY }));
+    const { endpoint, upstream } = await setup({
+      resolveHeaders: vi.fn(async (request) => {
+        if (!isOfficialNetworkPluginEnabled(request.pluginId, { userConfigPath, workingDirectory: root, env: {} })) {
+          return { ok: false as const, reason: "official_auth_unavailable" as const };
+        }
+        return identity();
+      }),
+    });
+    const env = await endpoint.envForSession("old-session", WORKSPACE_A);
+    await writeFile(userConfigPath, JSON.stringify({ plugins: { enabledPlugins: { [id]: true } } }));
+    expect((await call(env, "/api/v1/sites/usage")).status).toBe(200);
+    expect(upstream.seen).toHaveLength(1);
+    await writeFile(userConfigPath, JSON.stringify({ plugins: { enabledPlugins: { [id]: false } } }));
+    expect((await call(env, "/api/v1/sites/deployments", { method: "POST", body: "private-project-fixture" })).status).toBe(401);
+    expect(upstream.seen).toHaveLength(1);
+    expect(identity).toHaveBeenCalledTimes(1);
   });
 
   it("asks for identity with the workspace of the session that owns the token", async () => {

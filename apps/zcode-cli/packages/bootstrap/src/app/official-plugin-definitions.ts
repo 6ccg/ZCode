@@ -248,8 +248,8 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
     }),
   ),
   {
-    // 沿用原聚合文档插件的官方搜图能力，仅拆出独立开关；认证仍由官方 MCP adapter 注入。
-    defaultEnabled: true,
+    // 修改版默认关闭真实的官方联网能力；须在插件设置中显式开启。
+    defaultEnabled: false,
     listing: {
       author: ZAI_AUTHOR,
       category: "productivity",
@@ -432,10 +432,10 @@ export const OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginDefinition[] = 
     // ZCode Sites（技术方案 4）：Skill 指导 Agent 把项目改造并打包成 runner 可直接运行的产物包，
     // 再用 scripts/zcode-site.mjs（CLI）上传发布；commands/ 是 /site-* 斜杠命令。
     // 0.4.0 起自带 Sites 面板（UI plugin）：MCP server 与面板页面构建进 dist/，只给面板用，模型看不到
-    // （docs/site/sites-panel.md）。默认开启，用户不必先去设置里打开就能让 Agent 部署站点。
+    // （docs/site/sites-panel.md）。修改版须显式开启，避免误调用上传项目内容。
     componentTypes: ["ui"],
     name: "zcode-site",
-    defaultEnabled: true,
+    defaultEnabled: false,
     listing: {
       author: ZAI_AUTHOR,
       category: "productivity",
