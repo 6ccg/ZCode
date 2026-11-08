@@ -18,6 +18,12 @@ Windows 沿用 macOS 已验证的“Agent 只连接 broker、Helper 独立持有
 
 `@zcode/zcode-cua` 是 Helper JavaScript、native source、addon 与版本校验的唯一包身份；不得再为同一 Git 提交声明 helper-runtime alias。macOS/Windows CI 必须从 canonical 包重建目标架构 addon，缺少 `binding.gyp` 或对应平台源码时 fail closed。
 
+本 fork 的显式本地输入也支持已经打包好的 `@zcode/zcode-cua-helper-runtime` 目录，
+用于检查和暂存现有 Windows helper，而不是增加另一个源码依赖身份。它必须保留
+原有 manifest、哈希、Electron 版本和连接行为；版本不同需要原生验证，不重写为
+目标版本。此资源适配不会解除开源 producer 占位门禁，也不代表 CUA 已能运行。
+范围、测试与未完成项见 [预打包 Helper 适配](../../specs/prebuilt-computer-use-helper.md)。
+
 ```text
 构建期
 
