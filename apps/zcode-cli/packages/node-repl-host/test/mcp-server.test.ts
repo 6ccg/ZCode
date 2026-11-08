@@ -75,6 +75,24 @@ describe("node_repl MCP server", () => {
     });
   });
 
+  it("requires explicit source backend opt-in and an enabled plugin root", async () => {
+    for (const env of [
+      {},
+      { ZCODE_CUA_SOURCE_BACKEND: "macos-ax" },
+      { ZCODE_CUA_PLUGIN_ROOT: "/tmp/cua-plugin" },
+      { ZCODE_CUA_SOURCE_BACKEND: "unknown", ZCODE_CUA_PLUGIN_ROOT: "/tmp/cua-plugin" },
+      { ZCODE_CUA_SOURCE_BACKEND: "macos-ax", ZCODE_CUA_PLUGIN_ROOT: " " },
+    ]) {
+      expect(captureComputerUseRuntimeFromEnvironment(env)).toBeUndefined();
+    }
+    const sourceRuntime = captureComputerUseRuntimeFromEnvironment({
+      ZCODE_CUA_SOURCE_BACKEND: "macos-ax",
+      ZCODE_CUA_PLUGIN_ROOT: "/tmp/cua-plugin",
+    });
+    expect(sourceRuntime).toBeDefined();
+    await sourceRuntime?.dispose();
+  });
+
   it("captures Computer Use credentials before the plugin host restores its environment", async () => {
     const capturedRuntime = captureComputerUseRuntimeFromEnvironment({
       ZCODE_CUA_PERMISSION_BROKER_SOCKET: "/tmp/deferred-cua.sock",

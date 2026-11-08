@@ -50412,3 +50412,9 @@ their own copyright notices and license terms:
 
 
 ````
+
+## Experimental source Computer Use
+
+The optional macOS AX backend introduces no bundled third-party runtime or native
+binary. It calls the operating system's own osascript/System Events at runtime.
+ZcodePro's vendor bundles, helper binaries and installers are not included.

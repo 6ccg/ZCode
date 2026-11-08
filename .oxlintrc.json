@@ -105,7 +105,6 @@
     ".agents/skills",
     "packages/formal-proof",
     "apps/zcode-cli",
-    "packages/zcode-cua",
     "docs/electron"
   ]
 }

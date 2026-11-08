@@ -1,6 +1,9 @@
+import { createSourceComputerUseRuntime } from "./src/source-runtime.js";
+
 const UNAVAILABLE_TEXT = "Computer Use is not available in this build.";
 
-export function createComputerUseRuntime(_options) {
+export function createComputerUseRuntime(options = {}) {
+  if (options.sourceBackend === "macos-ax") return createSourceComputerUseRuntime(options);
   return {
     async execute() {
       return {

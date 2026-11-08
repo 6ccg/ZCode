@@ -1,5 +1,25 @@
 # Computer Use
 
+## Experimental source backend
+
+If the host was started with `ZCODE_CUA_SOURCE_BACKEND=macos-ax` and this plugin
+is enabled, Computer Use uses the independent macOS accessibility backend. No
+official account or packaged Helper is needed; model API credentials remain in
+the normal provider configuration. The ordinary Helper status and permission
+onboarding do not describe this backend.
+
+This backend supports listing apps, observing the foreground application's AX
+tree, setting an exposed value and performing an exposed accessibility action.
+Every observation/action needs local native consent. The user must bring the
+target app to the foreground and grant macOS permissions themselves. It does not
+launch apps or provide background control. Screenshots, coordinate input,
+keyboard input, scrolling, drag and clipboard operations are unavailable. Do not
+retry unsupported operations or switch to direct shell automation after refusal.
+The foreground-only restrictions override background-control descriptions below
+when this experimental backend is selected. Otherwise the normal backend rules
+apply. This is an experimental subset, not full Computer Use parity.
+
+
 Fetch this reference on demand with
 `nodeRepl.write(await agent.documentation.get("computer-use"))`. It largely repeats
 the resident Computer Use skill, so read it only when you need an argument shape or

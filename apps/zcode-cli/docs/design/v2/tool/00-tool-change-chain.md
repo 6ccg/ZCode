@@ -1,5 +1,14 @@
 # Tool Change Chain Spec
 
+## Experimental source Computer Use
+
+An enabled Computer Use plugin and explicit `ZCODE_CUA_SOURCE_BACKEND=macos-ax`
+select the independent AX subset in the existing node_repl host. The MCP tool
+schema and authenticated call-ledger bridge do not change. Native consent,
+foreground scope, unsupported operations and regression requirements are defined
+in [the source backend spec](../../../../../../specs/source-computer-use.md).
+The legacy official-helper transport remains separate and fail closed.
+
 工具 schema、顺序与描述是固定字节（tools 段字节进入缓存前缀）：`toToolJsonSchema` 按
 zod v4 toJSONSchema 的 key 顺序输出——`$schema` 在最前，`description`、`default` 在 `type` 前，
 数组的 `minItems`/`maxItems` 在 `type` 前，属性声明顺序不变；ToolSearch 输入 schema 走同一入口。

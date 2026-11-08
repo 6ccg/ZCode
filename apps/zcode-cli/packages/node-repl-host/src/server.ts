@@ -453,6 +453,10 @@ if (!isMainThread && isWorkerCallData(workerData)) {
 export function captureComputerUseRuntimeFromEnvironment(
   env: NodeJS.ProcessEnv = process.env,
 ): ComputerUseRuntime | undefined {
+  // 独立源码后端必须同时显式选择并启用插件；不能用伪 socket 激活旧 Helper。
+  if (env.ZCODE_CUA_SOURCE_BACKEND === "macos-ax" && env.ZCODE_CUA_PLUGIN_ROOT?.trim()) {
+    return createComputerUseRuntime({ sourceBackend: "macos-ax" });
+  }
   const socketPath = env.ZCODE_CUA_PERMISSION_BROKER_SOCKET?.trim();
   if (!socketPath) return undefined;
   return createComputerUseRuntime({

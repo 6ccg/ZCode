@@ -1,0 +1,10 @@
+/**
+ * zcode-cua-source 模块清单（architecture-governance managed 模块）。
+ * 层：adapters。修改 requires 时同步更新 architecture-policy.yaml（检查器会校验两者一致）。
+ */
+export const zcodeCuaSourceModule = {
+  id: "zcode-cua-source",
+  requires: [],
+  provides: ["zcode-cua-source"],
+  publicEntrypoints: ["source-runtime.js", "contract.ts"],
+} as const;

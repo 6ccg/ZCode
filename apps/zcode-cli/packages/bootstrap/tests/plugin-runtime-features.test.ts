@@ -74,6 +74,26 @@ describe("resolvePluginRuntimeFeatures", () => {
     ).toEqual({});
   });
 
+  it("forwards source backend opt-in only with the enabled Computer Use plugin", () => {
+    for (const enabled of [true, false]) {
+      for (const backend of [undefined, "macos-ax", "unknown"]) {
+        const servers = resolveBuiltInNodeReplMcpServers({
+          pluginOutcome: outcome([
+            plugin("node-repl-host@zcode-plugins-official", true, "/tmp/host"),
+            plugin("browser-use@zcode-plugins-official", true),
+            plugin("computer-use@zcode-plugins-official", enabled, "/tmp/cua-plugin"),
+          ]),
+          workingDirectory: "/workspace",
+          env: { ZCODE_CUA_SOURCE_BACKEND: backend },
+        });
+        const server = servers.node_repl;
+        expect(server?.type === "stdio" ? server.env?.ZCODE_CUA_SOURCE_BACKEND : undefined).toBe(
+          enabled && backend === "macos-ax" ? "macos-ax" : undefined,
+        );
+      }
+    }
+  });
+
   it("serves Computer Use without the Browser Use package", () => {
     // 回归（2026-09-11）：宿主产物过去只从 browser-use 的 rootPath 取，browser-use 包缺失时
     // 即便 CUA 启用也拿不到宿主。三个包独立后两个能力对称。

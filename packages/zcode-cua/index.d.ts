@@ -28,6 +28,8 @@ export interface ComputerUseRuntime {
 }
 
 export interface ComputerUseRuntimeOptions {
+  /** Explicit local-only experimental AX backend, without an official helper. */
+  sourceBackend?: "macos-ax";
   brokerSocketPath?: string;
   refreshMarkerPath?: string;
   ensureBrokerAvailable?: () => Promise<void>;
