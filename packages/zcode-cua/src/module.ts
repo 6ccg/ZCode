@@ -6,5 +6,5 @@ export const zcodeCuaSourceModule = {
   id: "zcode-cua-source",
   requires: [],
   provides: ["zcode-cua-source"],
-  publicEntrypoints: ["source-runtime.js", "contract.ts"],
+  publicEntrypoints: ["source-runtime.js", "external-windows-runtime.js", "contract.ts"],
 } as const;

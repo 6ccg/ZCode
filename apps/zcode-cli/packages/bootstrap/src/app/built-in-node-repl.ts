@@ -39,6 +39,10 @@ export function resolveBuiltInNodeReplMcpServers(input: {
       // 领域 root 各自注入，且只在对应能力启用时注入：宿主据此决定哪一半文档可用。
       ...(browserUsePackage ? { ZCODE_PLUGIN_ROOT: browserUsePackage.rootPath } : {}),
       ...(cuaPackage ? { ZCODE_CUA_PLUGIN_ROOT: cuaPackage.rootPath } : {}),
+      // 外部 Windows JS runtime 只随启用的 CUA 能力进入共享宿主，不能由浏览器插件激活。
+      ...(cuaPackage && env.ZCODE_CUA_RUNTIME_PACKAGE_DIR?.trim()
+        ? { ZCODE_CUA_RUNTIME_PACKAGE_DIR: env.ZCODE_CUA_RUNTIME_PACKAGE_DIR.trim() }
+        : {}),
       ...(cuaPackage && env.ZCODE_CUA_SOURCE_BACKEND === "macos-ax"
         ? { ZCODE_CUA_SOURCE_BACKEND: "macos-ax" }
         : {}),

@@ -3,6 +3,12 @@ import type { CuaPermissionRestartOptions, CuaPermissionRestartResult } from "./
 export declare const HELPER_ADDON_ENV: string;
 export declare const WINDOWS_DEV_CONTROL_PROTOCOL: string;
 
+/** Forward the verified external Windows JS runtime path to local Agent processes. */
+export declare function resolveWindowsCuaRuntimeEnvironment(options?: {
+  env?: NodeJS.ProcessEnv;
+  resourcesPath?: string;
+}): Record<string, string>;
+
 export interface HelperLaunchSpec {
   [key: string]: unknown;
 }

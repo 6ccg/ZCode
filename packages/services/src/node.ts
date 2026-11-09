@@ -593,6 +593,7 @@ import {
   isScreenCaptureProbeSuccess,
   reapOrphanedHelpers,
   resolveStandaloneStatusLaunchAppPath,
+  resolveWindowsCuaRuntimeEnvironment,
   shouldRunCuaScreenCaptureProbe,
   type CuaHelperHost,
   type CuaHelperTransportRestartOptions,
@@ -613,6 +614,7 @@ import {
 } from "#src/cua-permission-broker/windowsCuaDevRuntime.js";
 import { createCanonicalCuaHelperInstaller } from "./cua-permission-broker/cuaHelperInstaller.js";
 import { WindowsCuaHelperHost } from "#src/cua-permission-broker/windowsCuaDevHelperHost.js";
+import { selectWindowsCuaHelperResolver } from "#src/cua-permission-broker/windowsCuaHelperHostSupport.js";
 import {
   getStableCuaPipeName,
   resolveStableCuaWinRecipe,
@@ -870,18 +872,26 @@ export function createDynamicCuaProductMcpServerResolver(options: {
     resolver: CuaProductMcpServerResolver,
     context?: CuaProductMcpServerResolverContext,
   ) => boolean;
+  onPreparationError?: (error: unknown) => void;
 }): CuaProductMcpServerResolver {
   return {
     async resolveMcpServers(servers, context) {
       if (!options.isPluginEnabled(context)) return servers;
-      const resolver = await options.getResolver(context);
-      if (!resolver) return servers;
-      const resolved = await resolver.resolveMcpServers(servers, context);
-      // delegate 可能跨过 Helper start/health await；dispose 在等待中置 terminal 时，不能把旧代际
-      // 刚注入的 socket/token 交给晚到 Agent。移除 CUA candidate，保持其它 MCP 原样。
-      return options.isResolverCurrent?.(resolver, context) === false
-        ? servers?.filter((server) => !isPotentialZCodeCuaAgentMcpServer(server))
-        : resolved;
+      try {
+        const resolver = await options.getResolver(context);
+        if (!resolver) return servers;
+        const resolved = await resolver.resolveMcpServers(servers, context);
+        // delegate 可能跨过 Helper start/health await；dispose 在等待中置 terminal 时，不能把旧代际
+        // 刚注入的 socket/token 交给晚到 Agent。移除 CUA candidate，保持其它 MCP 原样。
+        return options.isResolverCurrent?.(resolver, context) === false
+          ? servers?.filter((server) => !isPotentialZCodeCuaAgentMcpServer(server))
+          : resolved;
+      } catch (error) {
+        // 外部 bridge 的兼容冷启动也属于可选 CUA 准备。失败不应阻止普通 Agent 会话；
+        // 显式 restart 保留下面原有的异常路径，以便设置页展示具体失败。
+        options.onPreparationError?.(error);
+        return servers?.filter((server) => !isPotentialZCodeCuaAgentMcpServer(server));
+      }
     },
     async restart() {
       // 委托到底层真实 resolver（由 ICuaPermissionService.restartHelper 经此调用）。
@@ -2400,6 +2410,8 @@ export function createLocalServices(options: {
           [ZCODE_CUA_PLUGIN_AUTHORITY_ENV_KEY]: randomBytes(16).toString("hex"),
         };
         if (process.platform === "win32") {
+          // Node 模式的 Agent 不保证有 resourcesPath，必须显式传递已验证的 JS runtime 根。
+          Object.assign(cuaProductHelperEnv, resolveWindowsCuaRuntimeEnvironment());
           const recipe = await resolveStableCuaWinRecipe();
           if (recipe) {
             cuaProductHelperEnv["ZCODE_CUA_WIN_HELPER_RECIPE"] = JSON.stringify({
@@ -2516,7 +2528,19 @@ export function createLocalServices(options: {
   // 避免开发场景下 resolver pass-through 而 helper 已建的割裂。
   const defaultCuaProductMcpServerResolver = createDynamicCuaProductMcpServerResolver({
     isPluginEnabled: (context) => isCuaEnabledForContext(context),
-    getResolver: async () => {
+    getResolver: async (context) => {
+      // 参考 JS runtime 没有新版 Windows recipe launcher；仅 bridge 路径由既有 Host
+      // 在启用的本地 MCP 准备边界完成启动，不能让 node_repl 永远连接一个未启动的 pipe。
+      if (process.platform === "win32") {
+        return selectWindowsCuaHelperResolver({
+          bridgeEnabled: Boolean(
+            resolveWindowsCuaRuntimeEnvironment().ZCODE_CUA_RUNTIME_PACKAGE_DIR,
+          ),
+          acquire: () => getOrCreateDefaultCuaProductHelper(context),
+          peek: () => defaultCuaProductHelperLifecycle.peek()?.helper,
+          isCurrent: isDefaultCuaProductHelperCurrent,
+        });
+      }
       // peek-only——resolver 属托管 host 体系，host 未建时返回 undefined（懒启动下
       // CUA 经 node_repl + 稳定 socket，不依赖此 resolver）；绝不在此 acquire。
       const helper = defaultCuaProductHelperLifecycle.peek()?.helper;
@@ -2524,6 +2548,11 @@ export function createLocalServices(options: {
     },
     isResolverCurrent: (resolver) =>
       defaultCuaProductHelperLifecycle.peek()?.helper.resolver === resolver,
+    onPreparationError: (error) =>
+      createServiceLogger("cua-product-helper").warn(undefined, "CUA MCP preparation failed", {
+        errorName: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+      }),
   });
   const cuaProductMcpServerResolver =
     options?.cuaProductMcpServerResolver ?? defaultCuaProductMcpServerResolver;

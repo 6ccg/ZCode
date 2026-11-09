@@ -7,7 +7,16 @@ select the independent AX subset in the existing node_repl host. The MCP tool
 schema and authenticated call-ledger bridge do not change. Native consent,
 foreground scope, unsupported operations and regression requirements are defined
 in [the source backend spec](../../../../../../specs/source-computer-use.md).
-The legacy official-helper transport remains separate and fail closed.
+The macOS official-helper transport remains separate and fail closed. Windows
+supports an explicitly supplied external JS runtime through
+`ZCODE_CUA_RUNTIME_PACKAGE_DIR`: the local Host resolves this absolute directory
+(explicit input first, then packaged `resources/tools/zcode-cua`) and forwards it
+only for enabled Computer Use. Invalid explicit input fails without fallback.
+This does not change tool schemas, approvals, context/lease checks or MCP result
+format. Existing Windows helper lifecycle remains the process owner; bridge-only
+MCP preparation waits for its startup because the reference JS runtime has no
+Windows lazy recipe launcher. Native compatibility is not inferred from mock tests.
+See [the bridge spec](../../../../../../specs/windows-external-runtime-bridge.md).
 
 工具 schema、顺序与描述是固定字节（tools 段字节进入缓存前缀）：`toToolJsonSchema` 按
 zod v4 toJSONSchema 的 key 顺序输出——`$schema` 在最前，`description`、`default` 在 `type` 前，

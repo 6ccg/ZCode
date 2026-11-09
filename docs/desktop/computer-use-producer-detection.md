@@ -19,8 +19,14 @@ Computer Use 的真实实现来自 workspace 包 `@zcode/zcode-cua`（producer�
 | Windows 运行时资源准备 `prepare:windows-cua-helper`                    | `packages/desktop/scripts/prepare-runtime-assets.mjs` |
 | 打包附带 macOS Helper、Windows Helper 资源，打包后的 Helper 校验与定稿 | `packages/desktop/electron-builder.config.js`         |
 
-Sharp 的暂存与校验仍以“producer 是否声明 Sharp 依赖”为准（`isSharpRequiredByComputerUse`），
-与本检测一致：真实 producer 声明 Sharp，占位包不声明。
+Sharp 的暂存与校验统一使用 `isSharpRequiredByComputerUse`，保留 producer 声明 Sharp
+依赖时的原有行为。Windows source bridge 仍是占位包且不声明 Sharp，但外部 runtime 从
+CUA plugin 根目录加载 Sharp；目标为 win32 且 `isWindowsComputerUseHelperEnabled`
+接受显式 JavaScript runtime 和 Helper 输入时，同样必须暂存并校验 Sharp。
+构建与 afterPack 都传入目标平台；没有输入的占位包以及 macOS/Linux source bridge 继续跳过。
+Windows source bridge 从显式 Helper 输入的 node_modules 同源获取整套 Sharp 依赖，不要求
+开源 workspace 额外安装 Sharp，也不逐包回退到桌面依赖；Helper 本身仍须通过原有严格校验。
+详见 `specs/windows-cua-sharp-staging.md`。这些 gate 不表示外部原生产物已经验证可用。
 
 ## 所有者与接口
 

@@ -1191,6 +1191,7 @@ modules:
     requires: []
     publicEntrypoints:
       - packages/zcode-cua/src/source-runtime.js
+      - packages/zcode-cua/src/external-windows-runtime.js
       - packages/zcode-cua/src/contract.ts
     layers:
       adapters: .

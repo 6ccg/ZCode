@@ -6,8 +6,11 @@ The Windows resource preparer accepts an explicitly supplied, already packaged
 `@zcode/zcode-cua-helper-runtime` directory as well as the existing canonical
 source producer. This supports the layout distributed by ZcodePro without
 copying its runtime or proprietary native binaries into this repository.
-It does not make the open-source broker placeholders into a working producer.
-The producer-detection gate and the experimental macOS AX backend are unchanged.
+Resource staging alone does not provide an executable broker. The separate
+[Windows runtime bridge](windows-external-runtime-bridge.md) connects an explicit
+external JavaScript runtime to the existing host, with a narrower Windows-only
+capability gate. The legacy producer gate and experimental macOS AX backend remain
+unchanged; no native Windows compatibility result is implied.
 
 The resource preparer owns validation and atomic staging. The supplied helper
 continues to own its existing connection and authorization behavior. Its JavaScript
@@ -68,8 +71,16 @@ The original helper executable SHA-256 is
 
 Static metadata: bundle `dev.zcode.cua-helper`, build `pipeline-326130-a2d1ba73`,
 arm64 executable/addon and embedded broker IPC version 3. The referenced ZcodePro
-client uses IPC v2; backward compatibility is not runtime-verified. The original
+client uses IPC v2. The inspected v3 server rejects newer client versions, not
+all non-equal versions: v2 is not rejected by that version gate. This is not
+evidence that all v2 tool semantics work. The original
 compiled unsigned-launcher gate remains false. A code-signature resource exists,
 but Linux inspection does not establish a valid Apple signature or notarization.
 No helper-level redistribution license was located in the archive. The downloaded
 artifacts remain outside this repository and were never executed or patched.
+
+The manifest and archive hash were checked again on 2026-11-09 UTC; 3.17.2 remains
+the manifest's current arm64 channel-1 release. See
+[the static compatibility analysis](../docs/analysis/macos-cua-helper-compatibility-3.17.2.md)
+for the protocol changes, launcher/peer trust boundary and remaining source-port
+work. This analysis does not enable the official helper in this fork.

@@ -2,7 +2,7 @@
   "name": "@zcode/zcode-cua",
   "version": "0.6.5",
   "private": true,
-  "description": "Computer Use contracts with an opt-in experimental macOS AX source backend. Official helper surfaces remain unavailable.",
+  "description": "Computer Use contracts with a Windows external-runtime bridge and an opt-in experimental macOS AX source backend.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -62,5 +62,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1"
   },
-  "zcodeCuaPlaceholder": true
+  "zcodeCuaPlaceholder": true,
+  "zcodeCuaRuntimeCapabilities": {
+    "windowsBroker": true
+  }
 }

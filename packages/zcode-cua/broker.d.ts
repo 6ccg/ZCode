@@ -57,20 +57,44 @@ export declare function mintBrokerSocketPath(options?: SocketPathOptions): strin
 export declare function resolveBrokerSocketPath(options?: SocketPathOptions): string;
 
 export interface BrokerRequest {
-  id?: string | null;
+  /** Non-negative safe integer; malformed or missing IDs are reported as 0. */
+  id: number;
   method: string;
-  params?: unknown;
+  params: Record<string, unknown>;
 }
 
-export interface BrokerResponse {
-  ok: boolean;
-  [key: string]: unknown;
+export type BrokerRequestParseResult =
+  | { ok: true; request: BrokerRequest }
+  | { ok: false; id: number; code: "invalid_request"; message: string };
+
+export interface BrokerSuccessResponse<T = unknown> {
+  id: number;
+  ok: true;
+  result: T | null;
+  presentation?: unknown;
 }
 
-export declare function parseRequestLine(line: string): BrokerRequest | undefined;
-export declare function okResponse(result: unknown): BrokerResponse;
-export declare function errorResponse(message: string, options?: { code?: string }): BrokerResponse;
-export declare function errorResponseFromException(error: unknown): BrokerResponse;
+export interface BrokerErrorResponse {
+  id: number;
+  ok: false;
+  error: { code: BrokerErrorCode; message: string; details?: Record<string, unknown> };
+}
+
+export type BrokerResponse<T = unknown> = BrokerSuccessResponse<T> | BrokerErrorResponse;
+
+export declare function parseRequestLine(line: string): BrokerRequestParseResult;
+export declare function okResponse<T>(
+  id: number,
+  result: T,
+  presentation?: unknown,
+): BrokerSuccessResponse<T>;
+export declare function errorResponse(
+  id: number,
+  code: BrokerErrorCode,
+  message: string,
+  details?: Record<string, unknown>,
+): BrokerErrorResponse;
+export declare function errorResponseFromException(id: number, error: unknown): BrokerErrorResponse;
 export declare function serializeResponse(response: BrokerResponse): string;
 
 export type BrokerErrorCode = string;
