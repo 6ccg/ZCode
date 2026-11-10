@@ -85,7 +85,12 @@ export function createProductCuaHelperHost(options = {}) {
       "--exit-log",
       options.exitLogPath ?? helperExitLogPathFor(socketPath, env),
     ];
-    await execute("/usr/bin/open", args, { env, timeout: 30000 });
+    try {
+      await execute("/usr/bin/open", args, { env, timeout: 30000 });
+    } catch (error) {
+      // execFile 的原始异常含完整命令；不能把本次 Host 凭据写入应用日志。
+      throw new Error(`Computer Use LaunchServices failed (${error.code ?? "unknown"})`);
+    }
     const health = await probe(socketPath, {
       pluginAuthority,
       timeoutMs: options.healthTimeoutMs ?? 30000,
