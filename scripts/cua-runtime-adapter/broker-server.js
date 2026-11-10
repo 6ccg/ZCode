@@ -2,6 +2,11 @@
 import { chmod, rename, rm, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { CuaHelperError, BrokerError } from "./broker.js";
+export {
+  createProductCuaHelperHost,
+  createCuaHelperInstaller,
+  resolveHelperPermissionSubjectIdentity,
+} from "./host-macos.js";
 var REFRESH_MARKER_SUFFIX = ".permission-refresh.json",
   REFRESH_MARKER_DEFAULT_DEADLINE_MS = 3e4,
   REFRESH_MARKER_MAX_DEADLINE_MS = 12e4,

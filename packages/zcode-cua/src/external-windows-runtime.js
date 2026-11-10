@@ -31,7 +31,7 @@ function regularContainedFile(root, path) {
 }
 
 export function resolveExternalWindowsCuaRuntime(options = {}) {
-  if ((options.platform ?? process.platform) !== "win32") return undefined;
+  if (!["win32", "darwin"].includes(options.platform ?? process.platform)) return undefined;
   const env = options.env ?? process.env;
   const explicit = env[WINDOWS_CUA_RUNTIME_ROOT_ENV]?.trim();
   const resourcesPath = options.resourcesPath ?? process.resourcesPath;

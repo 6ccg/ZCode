@@ -622,6 +622,7 @@ import {
 } from "#src/cua-permission-broker/stableCuaTransport.js";
 import { HELPER_APP_NAME } from "@zcode/zcode-cua/broker/helperConstants";
 import { resolveBrokerSocketPath } from "@zcode/zcode-cua/broker/socketPath";
+import { mintBrokerSocketPath } from "@zcode/zcode-cua/broker";
 import {
   DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
   ZCODE_JWT_INVALID_BROADCAST_CHANNEL,
@@ -1070,13 +1071,12 @@ export function createDefaultCuaProductHelper(
   }
   const logger = createServiceLogger("cua-product-helper");
   // 随包后端的 spawn、health 和 helper 必须共享同一份凭据；每个 Agent 另铸随机值会认证失败。
-  const admissionTransport =
-    platform === "win32" && resolveWindowsCuaRuntimeEnvironment().ZCODE_CUA_RUNTIME_PACKAGE_DIR
-      ? {
-          socketPath: getStableCuaPipeName(),
-          pluginAuthority: randomBytes(16).toString("hex"),
-        }
-      : undefined;
+  const admissionTransport = resolveWindowsCuaRuntimeEnvironment().ZCODE_CUA_RUNTIME_PACKAGE_DIR
+    ? {
+        socketPath: platform === "win32" ? getStableCuaPipeName() : mintBrokerSocketPath({ env }),
+        pluginAuthority: randomBytes(16).toString("hex"),
+      }
+    : undefined;
   // Best-effort, once per process: reap Helpers orphaned by prior sessions before minting a
   // fresh one. Complements the per-Helper launcher-pid watchdog (helperMain); the reaper never
   // throws, so it cannot block startup.
@@ -1098,6 +1098,7 @@ export function createDefaultCuaProductHelper(
     macPermissionHost =
       options.createMacHost?.() ??
       createProductCuaHelperHost({
+        ...(admissionTransport ?? {}),
         logger,
         env: process.env,
         helperInstaller: createCanonicalCuaHelperInstaller({
@@ -1941,6 +1942,7 @@ export function createLocalServices(options: {
       if (host?.running && host.socketPath) {
         return {
           socketPath: host.socketPath,
+          pluginAuthority: host.pluginAuthority ?? undefined,
         };
       }
       // 懒启动：无托管 host 时探测稳定 socket 上自启动的 Helper（probe-only，不拉起）。
@@ -2564,7 +2566,7 @@ export function createLocalServices(options: {
       // 参考 JS runtime 没有新版 Windows recipe launcher；仅 bridge 路径由既有 Host
       // 在启用的本地 MCP 准备边界完成启动，不能让 node_repl 永远连接一个未启动的 pipe。
       if (
-        process.platform === "win32" &&
+        (process.platform === "win32" || process.platform === "darwin") &&
         resolveWindowsCuaRuntimeEnvironment().ZCODE_CUA_RUNTIME_PACKAGE_DIR
       ) {
         return selectWindowsCuaHelperResolver({

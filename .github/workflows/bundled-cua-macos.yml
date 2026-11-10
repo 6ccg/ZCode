@@ -1,0 +1,45 @@
+name: Bundled macOS Computer Use
+on:
+  push:
+    branches: [codex/macos-component]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  component:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+      - name: Prepare component tools
+        run: |
+          test "$(uname -m)" = arm64
+          npm install --prefix "$RUNNER_TEMP/cua-tools" typescript@6.0.2 --no-audit --no-fund
+          ln -s "$RUNNER_TEMP/cua-tools/node_modules" node_modules
+      - name: Assemble and sign the bundled component
+        run: |
+          node scripts/bundled-cua.mjs --target darwin-arm64 --archive "$RUNNER_TEMP/cua/ZCode-3.17.2-mac-arm64.zip" --output "$RUNNER_TEMP/cua/bundle" --sign-macos
+          node --test scripts/test/bundled-cua.test.mjs scripts/test/bundled-cua-macos.test.mjs
+      - name: Verify real helper and local transport
+        run: node scripts/test/bundled-cua-macos-smoke.mjs "$RUNNER_TEMP/cua/bundle"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - name: Build application
+        env:
+          ZCODE_CUA_BUNDLE_DIR: ${{ runner.temp }}/cua/bundle
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          unlink node_modules
+          pnpm install --frozen-lockfile
+          pnpm --filter @zcode/desktop build
+          cd packages/desktop
+          pnpm exec electron-builder --config electron-builder.config.js --mac zip --arm64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zcode-mac-arm64-computer-use
+          path: packages/desktop/dist/*.zip
+          if-no-files-found: error

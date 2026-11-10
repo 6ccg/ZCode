@@ -232,6 +232,8 @@ export async function handleRequestLine(backend, line) {
 // 此适配产物只用于 Windows；Host 和客户端共享原生 named pipe。
 const WINDOWS_NAMED_PIPE_PREFIX = "\\\\.\\pipe\\zcode-cua-helper-";
 export function mintBrokerSocketPath() {
+  if (process.platform === "darwin")
+    return `/tmp/zcode-cua-${process.getuid()}-${randomBytes(12).toString("hex")}.sock`;
   return WINDOWS_NAMED_PIPE_PREFIX + randomBytes(8).toString("hex");
 }
 

@@ -17,6 +17,13 @@ export const CUA_RELEASE = Object.freeze({
   electronVersion: "44.7.0",
   serverSha256: "2ec51dbeea3449812d04499f1d0c6898346e432c8d94280d855459d29fae68b5",
   targets: {
+    "darwin-arm64": {
+      file: "ZCode-3.17.2-mac-arm64.zip",
+      directory: "macos-arm64",
+      sha256: "7f95b42d2066d4633c95d117c67f124a1499d9832060a58ccd53d0a43f4a06ab",
+      helperSha256: "36ba7e600dce3cc715bdf278459fedb89eb9622dfbd8278abe9811f0717cad2b",
+      resources: "ZCode.app/Contents/Resources",
+    },
     "win32-x64": {
       file: "ZCode-3.17.2-win-x64.exe",
       directory: "windows-x64",
@@ -67,6 +74,45 @@ export function patchWindowsHelper(source) {
     "any local process can drive Computer Use",
     "this build requires the admitted Host authority for Computer Use",
   );
+}
+
+export function patchMacHelper(input) {
+  const bytes = Buffer.from(input);
+  const gate = Buffer.from("var allowUnsignedLauncherLocalDev = false;");
+  const gateAt = bytes.indexOf(gate);
+  const marker = "handleAuthenticate(conn, request) {";
+  const start = bytes.indexOf(marker);
+  if (
+    gateAt < 0 ||
+    bytes.indexOf(gate, gateAt + 1) !== -1 ||
+    start < 0 ||
+    bytes.indexOf(marker, start + 1) !== -1
+  )
+    throw new Error("Mac helper component input changed");
+  const prefix = "class Broker {";
+  const ast = ts.createSourceFile(
+    "helper.js",
+    prefix + bytes.subarray(start, start + 8192).toString("utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS,
+  );
+  const method = ast.statements[0]?.members?.[0];
+  if (
+    !method ||
+    !ts.isMethodDeclaration(method) ||
+    method.name.getText(ast) !== "handleAuthenticate"
+  )
+    throw new Error("Mac helper authentication layout changed");
+  const size = Buffer.byteLength(method.getText(ast));
+  // 自构建应用不能满足官方团队签名；保留同 UID 检查，并用本次 Host authority 同时约束 tool 和 PiP。
+  const replacement =
+    'handleAuthenticate(c,r){const a=process.env.ZCODE_CUA_PLUGIN_AUTHORITY;if(!a||a.length<16||r.params?.pluginAuthority!==a){c.closeAfterWrite=true;return errorResponse(r.id,"not_authorized","Host authority required")}const i=parseConnectionIdentity(r.params,c.connectionId);if(r.params?.role==="presentation"){if(c.peerVerdict&&this.peerPresentationEligible?.(c.peerVerdict)===true){this.markConnectionAuthenticated(c,i,"presentation");return okResponse(r.id,{authenticated:true,role:"presentation"})}c.closeAfterWrite=true;return errorResponse(r.id,"not_authorized","Unverified presentation peer")}this.markConnectionAuthenticated(c,i,"tool");return okResponse(r.id,{authenticated:true})}';
+  if (Buffer.byteLength(replacement) > size)
+    throw new Error("Mac helper adaptation exceeds SEA slot");
+  Buffer.from(replacement.padEnd(size, " ")).copy(bytes, start);
+  Buffer.from("var allowUnsignedLauncherLocalDev = true ;").copy(bytes, gateAt);
+  return bytes;
 }
 
 export function replaceFunctionBody(source, name, body) {
@@ -201,7 +247,7 @@ export function extractRuntime(server, exports) {
   return result;
 }
 
-export async function prepareCuaBundle({ resources, output, target }) {
+export async function prepareCuaBundle({ resources, output, target, signMacos = false }) {
   assertPrivateOutput(output);
   if (!CUA_RELEASE.targets[target]) throw new Error(`Unsupported fixed CUA target: ${target}`);
   const server = await readFile(
@@ -309,6 +355,35 @@ export async function prepareCuaBundle({ resources, output, target }) {
       JSON.stringify(metadata, null, 2) + "\n",
     );
   }
+  if (target === "darwin-arm64") {
+    const appName = "ZCode Computer Use.app";
+    const sourceApp = resolve(resources, "cua-helper", appName);
+    const relativeBinary = "Contents/MacOS/ZCode Computer Use";
+    const original = await readFile(resolve(sourceApp, relativeBinary));
+    requireHash(original, CUA_RELEASE.targets[target].helperSha256, "Mac helper");
+    const app = resolve(output, "helper", appName);
+    await cp(sourceApp, app, { recursive: true });
+    await writeFile(resolve(app, relativeBinary), patchMacHelper(original));
+    await cp(
+      resolve(sourceApp, "Contents/Resources/node_modules"),
+      resolve(output, "plugin/node_modules"),
+      { recursive: true },
+    );
+    if (signMacos) {
+      if (process.platform !== "darwin") throw new Error("Mac component signing requires macOS");
+      await run("chmod", ["+x", resolve(app, relativeBinary)]);
+      await run("codesign", [
+        "--force",
+        "--deep",
+        "--sign",
+        "-",
+        "--identifier",
+        "dev.zcode.cua-helper",
+        app,
+      ]);
+      await run("codesign", ["--verify", "--deep", "--strict", app]);
+    }
+  }
   const bundleManifest =
     JSON.stringify(
       {
@@ -322,6 +397,9 @@ export async function prepareCuaBundle({ resources, output, target }) {
         officialServerSha256: CUA_RELEASE.serverSha256,
         patchedRuntimeSha256: sha256(Buffer.from(vendor)),
         independentUpdates: false,
+        ...(target === "darwin-arm64"
+          ? { macosHelperSigned: signMacos && process.platform === "darwin" }
+          : {}),
       },
       null,
       2,
@@ -343,6 +421,7 @@ async function main() {
       resources: { type: "string" },
       archive: { type: "string" },
       "7zip": { type: "string", default: "7z" },
+      "sign-macos": { type: "boolean", default: false },
     },
   });
   const { target, output, archive } = values;
@@ -368,20 +447,24 @@ async function main() {
     }
     requireHash(bytes, pin.sha256, "archive");
     const extracted = `${archive}.extracted`;
-    await run(
-      values["7zip"],
-      [
-        "x",
-        "-y",
-        `-o${extracted}`,
-        archive,
-        `${pin.resources}/glm/packages/node-repl-host/dist/mcp/server.js`,
-        `${pin.resources}/tools/cua-helper/*`,
-      ],
-      {
-        maxBuffer: 4 * 1024 * 1024,
-      },
-    );
+    if (process.platform === "darwin" && target.startsWith("darwin")) {
+      await mkdir(extracted, { recursive: true });
+      await run("ditto", ["-x", "-k", archive, extracted]);
+    } else
+      await run(
+        values["7zip"],
+        [
+          "x",
+          "-y",
+          `-o${extracted}`,
+          archive,
+          `${pin.resources}/glm/packages/node-repl-host/dist/mcp/server.js`,
+          `${pin.resources}/tools/cua-helper/*`,
+        ],
+        {
+          maxBuffer: 4 * 1024 * 1024,
+        },
+      );
     resources = resolve(extracted, pin.resources);
   }
   if (!resources) throw new Error("Require --archive or --resources");
@@ -390,6 +473,7 @@ async function main() {
       resources,
       output,
       target,
+      signMacos: values["sign-macos"],
     }),
   );
 }

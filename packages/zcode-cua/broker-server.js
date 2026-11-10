@@ -19,6 +19,11 @@ export function buildHelperOpenArgs(_spec, _launcherPid) {
 }
 
 export async function resolveHelperPermissionSubjectIdentity(_appPath) {
+  const external = externalWindowsCuaFunction(
+    "./broker/server",
+    "resolveHelperPermissionSubjectIdentity",
+  );
+  if (external) return external(...arguments);
   throw new CuaHelperError(UNAVAILABLE);
 }
 
@@ -27,6 +32,8 @@ export function isCuaLocalDevelopmentRuntime(_env, _compiledLocalDevelopmentRunt
 }
 
 export function createCuaHelperInstaller(_options) {
+  const external = externalWindowsCuaFunction("./broker/server", "createCuaHelperInstaller");
+  if (external) return external(...arguments);
   return {
     ensureInstalled: unavailableReject,
     verifyInstalled: unavailableReject,
@@ -115,6 +122,8 @@ export class CuaProductHelperWorkspaceRegistry {
 }
 
 export function createProductCuaHelperHost(_options) {
+  const external = externalWindowsCuaFunction("./broker/server", "createProductCuaHelperHost");
+  if (external) return external(...arguments);
   return createUnavailableCuaHelperHost();
 }
 

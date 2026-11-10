@@ -52,10 +52,13 @@ export function isRealComputerUseProducerInstalled({ desktopPackageRoot }) {
 export function configureBundledComputerUse({ desktopPackageRoot, target, env = process.env }) {
   const input = env.ZCODE_CUA_BUNDLE_DIR?.trim();
   if (!input) return undefined;
-  if (target.os !== "win32") throw new Error("Bundled CUA currently supports Windows x64 only");
+  if (!["win32", "darwin"].includes(target.os))
+    throw new Error("Bundled CUA supports Windows and macOS only");
   if (!isAbsolute(input)) throw new Error("ZCODE_CUA_BUNDLE_DIR must be absolute");
   const bundle = JSON.parse(readFileSync(resolve(input, "bundle-manifest.json"), "utf8"));
   const targetKey = target.key ?? `${target.os}-${target.arch}`;
+  if (target.os === "darwin" && bundle.macosHelperSigned !== true)
+    throw new Error("Mac CUA helper must be signed on macOS before packaging");
   const app = JSON.parse(readFileSync(resolve(desktopPackageRoot, "package.json"), "utf8"));
   const workspace = JSON.parse(
     readFileSync(resolve(desktopPackageRoot, "../..", "package.json"), "utf8"),
@@ -76,7 +79,26 @@ export function configureBundledComputerUse({ desktopPackageRoot, target, env = 
   if (hash !== bundle.patchedRuntimeSha256) throw new Error("Bundled CUA runtime hash mismatch");
   env.ZCODE_CUA_RUNTIME_PACKAGE_DIR = runtimeRoot;
   if (target.os === "win32") env.ZCODE_CUA_HELPER_RUNTIME_PACKAGE_DIR = resolve(input, "helper");
+  if (target.os === "darwin")
+    env.ZCODE_CUA_HELPER_RUNTIME_PACKAGE_DIR = resolve(
+      input,
+      "helper/ZCode Computer Use.app/Contents/Resources",
+    );
   return { root: input, manifest: bundle, runtimeRoot };
+}
+
+export function isBundledMacComputerUseEnabled({
+  desktopPackageRoot,
+  platform,
+  env = process.env,
+}) {
+  if (platform !== "darwin") return false;
+  const producer = readComputerUseProducer({ desktopPackageRoot });
+  return (
+    producer.manifest?.zcodeCuaRuntimeCapabilities?.macosBroker === true &&
+    Boolean(env.ZCODE_CUA_RUNTIME_PACKAGE_DIR?.trim()) &&
+    Boolean(env.ZCODE_CUA_HELPER_RUNTIME_PACKAGE_DIR?.trim())
+  );
 }
 
 /** Windows broker capability is not proof of a usable or validated native helper. */

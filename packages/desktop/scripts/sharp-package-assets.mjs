@@ -37,6 +37,7 @@ import { createRequire } from "node:module";
 import { dirname, isAbsolute, resolve } from "node:path";
 import {
   isWindowsComputerUseHelperEnabled,
+  isBundledMacComputerUseEnabled,
   readComputerUseProducer,
 } from "./computer-use-producer.mjs";
 
@@ -185,11 +186,12 @@ export function isSharpRequiredByComputerUse({
     return true;
   return (
     producer.placeholder &&
-    isWindowsComputerUseHelperEnabled({
+    (isWindowsComputerUseHelperEnabled({
       desktopPackageRoot,
       platform: targetPlatform?.os,
       env,
-    })
+    }) ||
+      isBundledMacComputerUseEnabled({ desktopPackageRoot, platform: targetPlatform?.os, env }))
   );
 }
 
@@ -242,7 +244,8 @@ export function stageSharpIntoBundledAgents({
   let helperRoot;
   if (
     readComputerUseProducer({ desktopPackageRoot }).placeholder &&
-    isWindowsComputerUseHelperEnabled({ desktopPackageRoot, platform: targetPlatform.os, env })
+    (isWindowsComputerUseHelperEnabled({ desktopPackageRoot, platform: targetPlatform.os, env }) ||
+      isBundledMacComputerUseEnabled({ desktopPackageRoot, platform: targetPlatform.os, env }))
   ) {
     // 修复原因：开源包不安装 Sharp；已有外部 Helper 提供完整依赖，必须同源选取，
     // 不能逐包回退到桌面/祖先 node_modules 而混入另一版本或架构。Helper 的完整

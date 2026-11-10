@@ -36,7 +36,10 @@ export function createPipSessionClient(options = {}) {
     new PermissionBrokerClient(socketPath(), {
       timeoutMs,
       peerChecker: options.peerChecker,
-      authenticateParams: { role: "presentation" },
+      authenticateParams: {
+        role: "presentation",
+        pluginAuthority: options.pluginAuthority ?? process.env.ZCODE_CUA_PLUGIN_AUTHORITY,
+      },
     });
 
   const handshake = async () => {

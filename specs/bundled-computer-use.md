@@ -18,7 +18,7 @@
 | 组件构建 | `scripts/bundled-cua.mjs`：校验输入、适配接口并生成组件包及来源清单     |
 | 发布资源 | `resources/tools/zcode-cua` 与 `resources/tools/cua-helper`             |
 
-本地 `WindowsCuaHelperHost` 唯一持有原生进程和 admission transport（socket/authority）。Agent spawn 只 acquire Host；启用 CUA 后的 MCP 准备阶段才启动 helper。SDK factory 捕获 authority，使 plugin host 清理环境变量后仍可认证。停止排空原进程后才允许重启。
+本地 Host 唯一持有原生进程和 admission transport（socket/authority）。Windows 使用 `WindowsCuaHelperHost`，macOS 使用组件桥接中的 `createProductCuaHelperHost`。Agent spawn 只 acquire Host；启用 CUA 后的 MCP 准备阶段才启动 helper。SDK factory 捕获 authority，使 plugin host 清理环境变量后仍可认证。停止排空原进程后才允许重启。
 
 ```mermaid
 sequenceDiagram
@@ -34,7 +34,7 @@ sequenceDiagram
 
 ## 版本与构建
 
-当前发布目标为 Windows x64，应用 3.17.2、CUA 0.6.5、Electron 44.7.0。版本、来源归档与输入哈希集中在 `CUA_RELEASE`；构建清单记录实际输入和输出哈希。归档中的 CUA 段边界及公共导出必须与当前接口匹配，升级应用时一并验证。
+当前组件目标为 Windows x64 和 macOS arm64，应用 3.17.2、CUA 0.6.5、Electron 44.7.0。版本、来源归档与输入哈希集中在 `CUA_RELEASE`；构建清单记录实际输入和输出哈希。归档中的 CUA 段边界及公共导出必须与当前接口匹配，升级应用时一并验证。
 
 构建只选取 CUA 及其运行依赖。组件中的 helper 下载入口不可用，缺少随包资源时明确报错。helper 的 broker authenticate 要求 Host 签发的 authority，缺失或错误凭据必须拒绝。资源准备和 afterPack 复用同一组版本、架构、路径与哈希校验。
 
@@ -47,7 +47,15 @@ pnpm bundle:desktop -- --os win --arch x64
 pnpm exec tsx scripts/test/bundled-cua-windows-smoke.mts D:/private/release/win-unpacked/resources
 ```
 
-构建变量仅供构建机选择组件，最终用户无需设置。macOS 集成暂缓。
+构建变量仅供构建机选择组件，最终用户无需设置。
+
+## macOS 组件接入
+
+- arm64 组件从同版本 Mac 归档取得。构建只修改固定哈希 helper 的 SEA JavaScript 段，保持 Mach-O 布局和源码字节长度，之后在 macOS 重新签名并严格验签。
+- helper 保留同 UID 原生 peer 检查，以 Host authority 验证工具与 presentation 连接。自构建应用不要求官方团队签名；签名适配只影响此组件，不把整个 SDK 切换成开发模式，也不修改 TCC。
+- Host 经 LaunchServices 启动随包 `.app`，为本次启动注入 authority；SDK、health、PiP 使用同一份凭据。权限仍归 helper 的系统授权主体；关闭 CUA 后不加载和调用。
+- Host 串行管理启动、停止与重启，停止只处理本 Host 的 PID，不按进程名称批量清理。终止未完成时拒绝新启动。
+- macOS runner 验证实际签名、helper 启动、错误凭据拒绝、权限状态、停止和重启；授权后的 UI 验收与静态构建分别记录。
 
 ## 维护与验证
 

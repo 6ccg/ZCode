@@ -64,6 +64,7 @@
   },
   "zcodeCuaPlaceholder": true,
   "zcodeCuaRuntimeCapabilities": {
-    "windowsBroker": true
+    "windowsBroker": true,
+    "macosBroker": true
   }
 }
