@@ -804,6 +804,43 @@ describe("NodePluginAdapter", () => {
     }
   });
 
+  it("does not load a separately installed official CUA SDK but preserves user-market plugins", async () => {
+    const root = await mkdtemp(join(tmpdir(), "zcode-fixed-cua-"));
+    try {
+      const pluginRoot = join(root, "plugin");
+      await writePluginManifest(pluginRoot, { name: "computer-use", version: "0.6.6" });
+      await writeFile(
+        join(root, "installed_plugins.json"),
+        JSON.stringify({
+          version: 1,
+          plugins: ["zcode-plugins-official", "user-market"].map((marketplace) => ({
+            id: `computer-use@${marketplace}`,
+            name: "computer-use",
+            marketplace,
+            version: "0.6.6",
+            installPath: pluginRoot,
+            installedAt: "fixture",
+            scope: "user",
+          })),
+        }),
+      );
+      const outcome = await discoverNodePlugins({
+        storageRoot: root,
+        workingDirectory: root,
+        env: {},
+        config: {
+          enabled: true,
+          dirs: [],
+          enabledPlugins: {},
+          options: {},
+          suppressedBuiltins: [],
+        },
+      });
+      expect(outcome.plugins.map((plugin) => plugin.id)).toEqual(["computer-use@user-market"]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
   it("retains the first discovered agent source and rejects paths outside the plugin", async () => {
     const temporaryRoot = await mkdtemp(join(tmpdir(), "zcode-agent-component-source-"));
     const root = join(temporaryRoot, "plugin");
@@ -1190,13 +1227,18 @@ describe("NodePluginAdapter", () => {
     });
 
     expect(env).toMatchObject({
-      ALL_PROXY: "http://127.0.0.1:7890",
+      // Windows 的环境变量名不区分大小写，生产代码只保留一组代理键，避免冲突副本。
+      ...(process.platform === "win32"
+        ? {}
+        : {
+            ALL_PROXY: "http://127.0.0.1:7890",
+            HTTPS_PROXY: "http://127.0.0.1:7890",
+            HTTP_PROXY: "http://127.0.0.1:7890",
+            NO_PROXY: "localhost,127.0.0.1",
+          }),
       CURL_CA_BUNDLE: "/tmp/root-ca.pem",
       GIT_SSL_CAINFO: "/tmp/root-ca.pem",
-      HTTPS_PROXY: "http://127.0.0.1:7890",
-      HTTP_PROXY: "http://127.0.0.1:7890",
       NODE_EXTRA_CA_CERTS: "/tmp/root-ca.pem",
-      NO_PROXY: "localhost,127.0.0.1",
       PATH: "/usr/bin:/bin",
       REQUESTS_CA_BUNDLE: "/tmp/root-ca.pem",
       SSL_CERT_FILE: "/tmp/root-ca.pem",

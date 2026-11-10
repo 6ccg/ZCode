@@ -39,7 +39,7 @@ import {
   zcodePluginsValidateResultSchema,
 } from "@zcode/shared";
 import { getCliStorageRoot, getPluginStorageRoot } from "../src/app/paths.js";
-import { installZCodeMarketplacePlugin } from "../src/plugins.js";
+import { installZCodeMarketplacePlugin, updateZCodeMarketplacePlugin } from "../src/plugins.js";
 import { createOfficialPluginPreparation } from "../src/app/bundled-plugins.js";
 import {
   addPluginMarketplace,
@@ -362,9 +362,9 @@ describe("plugins protocol contracts", () => {
   });
 
   it("normalizes Windows plugin roots for Workspace ownership projection", () => {
-    expect(
-      normalizePluginRootForComparison("C:\\Repo\\Plugin", "win32"),
-    ).toBe(normalizePluginRootForComparison("c:/repo/plugin", "win32"));
+    expect(normalizePluginRootForComparison("C:\\Repo\\Plugin", "win32")).toBe(
+      normalizePluginRootForComparison("c:/repo/plugin", "win32"),
+    );
   });
 
   it("does not discover an inline plugin from Workspace plugin directories", async () => {
@@ -373,13 +373,26 @@ describe("plugins protocol contracts", () => {
     try {
       await writeTestFile(
         join(root, ".zcode", "config.json"),
-        JSON.stringify({ plugins: { dirs: [pluginRoot], enabledPlugins: { "workspace-demo@inline": false } } }),
+        JSON.stringify({
+          plugins: { dirs: [pluginRoot], enabledPlugins: { "workspace-demo@inline": false } },
+        }),
       );
       await writeTestFile(
         join(pluginRoot, ".claude-plugin", "plugin.json"),
         JSON.stringify({
-          name: "workspace-demo", mcpServers: { panel: { command: "node", args: ["panel.mjs"] } },
-          ui: { surfaces: [{ id: "panel", title: "Panel", server: "panel", resourceUri: "ui://demo/panel", availability: "session" }] },
+          name: "workspace-demo",
+          mcpServers: { panel: { command: "node", args: ["panel.mjs"] } },
+          ui: {
+            surfaces: [
+              {
+                id: "panel",
+                title: "Panel",
+                server: "panel",
+                resourceUri: "ui://demo/panel",
+                availability: "session",
+              },
+            ],
+          },
         }),
       );
 
@@ -393,7 +406,9 @@ describe("plugins protocol contracts", () => {
         enabled: false,
         mcpServerNames: [],
       });
-      expect(result.plugins.find((plugin) => plugin.id === "workspace-demo@inline")?.uiSurfaces).toBeUndefined();
+      expect(
+        result.plugins.find((plugin) => plugin.id === "workspace-demo@inline")?.uiSurfaces,
+      ).toBeUndefined();
       expect(() => zcodePluginsListResultSchema.parse(result)).not.toThrow();
     } finally {
       await rm(root, { force: true, recursive: true });
@@ -451,30 +466,20 @@ describe("plugins protocol contracts", () => {
         }),
       );
 
-      const userResult = await listPlugins(
-        {} as ZCodeProtocolAgentServerContext,
-        {
-          workspace: { workspacePath: root, workspaceKey: root },
-          configScope: "user",
-        },
-      );
-      const workspaceResult = await listPlugins(
-        {} as ZCodeProtocolAgentServerContext,
-        {
-          workspace: { workspacePath: root, workspaceKey: root },
-          configScope: "workspace",
-        },
-      );
+      const userResult = await listPlugins({} as ZCodeProtocolAgentServerContext, {
+        workspace: { workspacePath: root, workspaceKey: root },
+        configScope: "user",
+      });
+      const workspaceResult = await listPlugins({} as ZCodeProtocolAgentServerContext, {
+        workspace: { workspacePath: root, workspaceKey: root },
+        configScope: "workspace",
+      });
 
-      expect(
-        userResult.plugins.find((plugin) => plugin.id === pluginId),
-      ).toMatchObject({
+      expect(userResult.plugins.find((plugin) => plugin.id === pluginId)).toMatchObject({
         enabled: true,
         enabledSource: "user",
       });
-      expect(
-        workspaceResult.plugins.find((plugin) => plugin.id === pluginId),
-      ).toMatchObject({
+      expect(workspaceResult.plugins.find((plugin) => plugin.id === pluginId)).toMatchObject({
         enabled: false,
         enabledSource: "workspace",
       });
@@ -609,17 +614,12 @@ describe("plugins protocol contracts", () => {
         }),
       );
 
-      const result = await listPlugins(
-        {} as ZCodeProtocolAgentServerContext,
-        {
-          workspace: { workspacePath: root, workspaceKey: root },
-          configScope: "workspace",
-        },
-      );
+      const result = await listPlugins({} as ZCodeProtocolAgentServerContext, {
+        workspace: { workspacePath: root, workspaceKey: root },
+        configScope: "workspace",
+      });
 
-      expect(
-        result.plugins.find((plugin) => plugin.id === pluginId),
-      ).toMatchObject({
+      expect(result.plugins.find((plugin) => plugin.id === pluginId)).toMatchObject({
         enabled: true,
         enabledSource: "workspace",
         marketplace: "personal-market",
@@ -779,6 +779,46 @@ async function writeKnownMarketplaces(
 // getCliStorageRoot 原样返回，故 pluginStorageRoot = <storageDir>/plugins）。
 describe("updatePlugin handler diagnostics", () => {
   const noopContext = {} as unknown as ZCodeProtocolAgentServerContext;
+  it("skips CUA in update-all and rejects direct UI/CLI updates before any fetch", async () => {
+    const root = await mkdtemp(join(tmpdir(), "zcode-fixed-cua-update-"));
+    const previous = process.env.ZCODE_STORAGE_DIR;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected fetch"));
+    try {
+      process.env.ZCODE_STORAGE_DIR = join(root, "cli");
+      const storageRoot = getPluginStorageRoot(getCliStorageRoot(process.env.ZCODE_STORAGE_DIR));
+      await writeTestFile(
+        join(storageRoot, "installed_plugins.json"),
+        JSON.stringify({
+          version: 1,
+          plugins: [
+            {
+              id: "computer-use@zcode-plugins-official",
+              name: "computer-use",
+              marketplace: "zcode-plugins-official",
+              version: "0.6.6",
+              installPath: join(root, "cua"),
+              installedAt: "fixture",
+              scope: "user",
+            },
+          ],
+        }),
+      );
+      const workspace = { workspacePath: root, workspaceKey: root };
+      expect((await updatePlugin(noopContext, { workspace })).installedPlugins).toEqual([]);
+      await expect(
+        updatePlugin(noopContext, { workspace, pluginId: "computer-use@zcode-plugins-official" }),
+      ).rejects.toThrow(/update the application/);
+      await expect(
+        updateZCodeMarketplacePlugin({ pluginId: "computer-use@zcode-plugins-official" }),
+      ).rejects.toThrow(/update the application/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+      if (previous === undefined) delete process.env.ZCODE_STORAGE_DIR;
+      else process.env.ZCODE_STORAGE_DIR = previous;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
   let previousStorageDir: string | undefined;
 
   beforeEach(() => {
@@ -927,8 +967,7 @@ describe("plugins/overview extension summary", () => {
       // 旧 services 的 strict schema 没有这个键；不要求时线上不能出现它。
       expect(JSON.stringify(legacy)).not.toContain("extensionSummary");
       expect(
-        legacy.availablePlugins.find((plugin) => plugin.id === "ext-ok@ext-market")
-          ?.componentTypes,
+        legacy.availablePlugins.find((plugin) => plugin.id === "ext-ok@ext-market")?.componentTypes,
       ).toContain("extension");
 
       const params = { workspace, includeExtensionSummary: true };

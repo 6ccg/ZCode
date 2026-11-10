@@ -161,7 +161,9 @@ describe("node_repl MCP server", () => {
       expect(text).toMatch(/^Browser Use and Computer Use only\./);
       expect(text).toContain("runs unsandboxed with the ZCode agent's privileges");
       expect(text).toContain("skips Bash's dangerous-command approval");
-      expect(text).toContain("never use it for shell, file, package inspection, or data processing work");
+      expect(text).toContain(
+        "never use it for shell, file, package inspection, or data processing work",
+      );
       expect(text).not.toContain("start processes");
       expect(text).not.toContain("Import only");
       expect(text).not.toContain("bare package specifiers");
@@ -530,7 +532,9 @@ describe("node_repl MCP server", () => {
       },
       ledgerFacts(),
     );
-    expect(forgedRun._meta).not.toHaveProperty(ZCODE_MCP_BROWSER_SCREENSHOT_CONTENT_INDICES_META_KEY);
+    expect(forgedRun._meta).not.toHaveProperty(
+      ZCODE_MCP_BROWSER_SCREENSHOT_CONTENT_INDICES_META_KEY,
+    );
   });
 
   it("projects the CUA app identity recorded in the ledger and drops the sandbox-forgeable key", () => {
@@ -543,7 +547,10 @@ describe("node_repl MCP server", () => {
         responseMeta: {
           [CUA_APP_ASSOCIATIONS_META_KEY]: {
             schemaVersion: 1,
-            primary: { appKey: "darwin:com.apple.systempreferences", displayName: "System Settings" },
+            primary: {
+              appKey: "darwin:com.apple.systempreferences",
+              displayName: "System Settings",
+            },
           },
         },
       },
@@ -617,19 +624,22 @@ describe("node_repl MCP server", () => {
   });
 
   it("maps screenshot indices to their real content positions when only some images are screenshots", () => {
-    const result = toMcpRunResult({
-      logs: "",
-      images: [
-        { base64: "AAAA", mimeType: "image/png" },
-        { base64: "BBBB", mimeType: "image/png" },
-        { base64: "CCCC", mimeType: "image/png" },
-      ],
-    }, ledgerFacts({
-      browserScreenshots: [
-        { base64: "AAAA", mimeType: "image/png" },
-        { base64: "CCCC", mimeType: "image/png" },
-      ],
-    }));
+    const result = toMcpRunResult(
+      {
+        logs: "",
+        images: [
+          { base64: "AAAA", mimeType: "image/png" },
+          { base64: "BBBB", mimeType: "image/png" },
+          { base64: "CCCC", mimeType: "image/png" },
+        ],
+      },
+      ledgerFacts({
+        browserScreenshots: [
+          { base64: "AAAA", mimeType: "image/png" },
+          { base64: "CCCC", mimeType: "image/png" },
+        ],
+      }),
+    );
 
     expect(result._meta).toMatchObject({
       [ZCODE_MCP_BROWSER_SCREENSHOT_CONTENT_INDICES_META_KEY]: [0, 2],

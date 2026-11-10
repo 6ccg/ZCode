@@ -76789,3 +76789,10 @@ their own copyright notices and license terms:
 
 
 ````
+
+## Bundled Windows Computer Use
+
+The private CUA runtime and native helper retain their original rights and are
+not covered by this repository's Apache-2.0 license. Bridge portions are adapted
+from luxi233/ZcodePro (MIT); the original copyright and license are preserved in
+`scripts/cua-runtime-adapter/LICENSE` and the packaged runtime's `NOTICE`.
