@@ -14,6 +14,7 @@ Read or operate the UI of native apps on the user's computer.
   technology.
 - Main agent only. Never delegate Computer Use to a subagent.
 
+
 ## Bootstrap every call
 
 Each `mcp__node_repl__js` call runs in a fresh Worker. Globals, imports, module

@@ -28,7 +28,12 @@ import {
   isSharpRequiredByComputerUse,
   verifyStagedSharp,
 } from "./scripts/sharp-package-assets.mjs";
-import { isRealComputerUseProducerInstalled } from "./scripts/computer-use-producer.mjs";
+import {
+  isRealComputerUseProducerInstalled,
+  isWindowsComputerUseHelperEnabled,
+  verifyWindowsComputerUseRuntime,
+  configureBundledComputerUse,
+} from "./scripts/computer-use-producer.mjs";
 import { verifyStagedKoffi } from "./scripts/koffi-package-assets.mjs";
 import {
   finalizePackagedWindowsCuaHelper,
@@ -67,8 +72,16 @@ const shouldEnableMacSigning =
   process.env.ZCODE_ENABLE_MAC_SIGN === "1" && Boolean(macSigningIdentity);
 const workspaceRoot = resolve(import.meta.dirname, "../..");
 const desktopPackageRoot = import.meta.dirname;
+const bundledCua = configureBundledComputerUse({ desktopPackageRoot, target: targetPlatform });
 // Computer Use Helper（macOS .app、Windows runtime）只随真实 producer 打包；开源占位包下跳过随包资源与校验。
-const shouldPackageComputerUseHelper = isRealComputerUseProducerInstalled({ desktopPackageRoot });
+const shouldPackageComputerUseHelper =
+  isRealComputerUseProducerInstalled({ desktopPackageRoot }) ||
+  (targetPlatform.os === "darwin" && Boolean(bundledCua));
+// Windows broker 能力与 macOS producer 隔离；显式 Helper 仍必须通过 staging/afterPack 校验。
+const shouldPackageWindowsCuaHelper = isWindowsComputerUseHelperEnabled({
+  desktopPackageRoot,
+  platform: targetPlatform.os,
+});
 const HELPER_FILENAME = "zcode-browser-import-helper.exe";
 const runtimeModuleLookupRoots = [
   desktopPackageRoot,
@@ -77,12 +90,10 @@ const runtimeModuleLookupRoots = [
   resolve(workspaceRoot, "node_modules", ".pnpm", "node_modules"),
 ];
 const desktopDistDir = process.env.ZCODE_DESKTOP_DIST_DIR || "dist";
-const bundledCuaHelperSource = resolve(
-  desktopPackageRoot,
-  "bundled-cua-helper",
-  targetPlatform.arch,
-  HELPER_APP_NAME,
-);
+const bundledCuaHelperSource =
+  bundledCua && targetPlatform.os === "darwin"
+    ? resolve(bundledCua.root, "helper", HELPER_APP_NAME)
+    : resolve(desktopPackageRoot, "bundled-cua-helper", targetPlatform.arch, HELPER_APP_NAME);
 const DEFAULT_ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/";
 // `pnpm exec asar` 依赖 `.bin/asar`，但 @electron/asar 仅是 electron-builder 传递依赖时，
 // Linux CI（pnpm hoisted）往往解析不到该二进制，`asar list` 未运行即 exit 1。
@@ -218,6 +229,8 @@ function assertPackagedCuaHelper(context) {
   if (!existsSync(appPath)) {
     throw new Error(`Packaged ZCode is missing bundled Computer Use Helper: ${appPath}`);
   }
+  if (bundledCua && process.platform === "darwin")
+    runCommand("codesign", ["--verify", "--deep", "--strict", appPath]);
 }
 const shouldEnableWindowsVsign =
   process.platform === "win32" && process.env.ZCODE_ENABLE_WINDOWS_SIGN === "1";
@@ -492,7 +505,7 @@ function assertPackagedNodePtyPrebuild(context) {
 }
 
 function assertPackagedCuaSharp(context) {
-  if (!isSharpRequiredByComputerUse({ desktopPackageRoot })) return;
+  if (!isSharpRequiredByComputerUse({ desktopPackageRoot, targetPlatform })) return;
   const problems = [
     [
       "packages/browser-use-plugin",
@@ -710,7 +723,16 @@ export default {
     runTimedSync("afterPack:assertPackagedCuaSharp", () => assertPackagedCuaSharp(context));
     runTimedSync("afterPack:assertPackagedCuaKoffi", () => assertPackagedCuaKoffi(context));
     runTimedSync("afterPack:assertPackagedCuaHelper", () => assertPackagedCuaHelper(context));
-    if (actualWindowsTarget && shouldPackageComputerUseHelper) {
+    if (bundledCua && targetPlatform.os === "darwin")
+      await verifyWindowsComputerUseRuntime({
+        sourceRoot: resolve(resolvePackagedResourcesDir(context), "tools/zcode-cua"),
+      });
+    if (actualWindowsTarget && shouldPackageWindowsCuaHelper) {
+      if (!shouldPackageComputerUseHelper) {
+        await verifyWindowsComputerUseRuntime({
+          sourceRoot: resolve(resolvePackagedResourcesDir(context), "tools", "zcode-cua"),
+        });
+      }
       await runTimedAsync("afterPack:finalizePackagedWindowsCuaHelper", () =>
         finalizePackagedWindowsCuaHelper({
           resourcesDir: resolvePackagedResourcesDir(context),
@@ -805,7 +827,10 @@ export default {
           },
         ]
       : []),
-    ...(targetPlatform.os === "win32" && shouldPackageComputerUseHelper
+    ...((shouldPackageWindowsCuaHelper && !shouldPackageComputerUseHelper) || Boolean(bundledCua)
+      ? [{ from: `bundled-tools/${targetPlatform.key}/zcode-cua`, to: "tools/zcode-cua" }]
+      : []),
+    ...(shouldPackageWindowsCuaHelper
       ? [
           {
             // 根因：electron-builder 会跳过 from 根目录下的 node_modules；主树与依赖树必须分开映射，

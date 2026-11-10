@@ -1,5 +1,6 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { ZCODE_CUA_OFFICIAL_PLUGIN_ID } from "@zcode/shared";
 import type {
   CustomCommandRoot,
   HookConfig,
@@ -266,6 +267,8 @@ export class NodePluginAdapter implements PluginPort {
       })),
     );
     for (const installed of listInstalledPluginRecords(request.storageRoot)) {
+      // 官方 CUA 只能使用软件随包的 seed；旧安装记录不能在 seed 缺失时换入另一版 SDK。
+      if (installed.id === ZCODE_CUA_OFFICIAL_PLUGIN_ID) continue;
       candidates.push({
         defaultEnabled: false,
         marketplace: installed.marketplace,

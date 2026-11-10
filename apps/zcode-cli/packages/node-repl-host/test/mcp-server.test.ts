@@ -75,6 +75,7 @@ describe("node_repl MCP server", () => {
     });
   });
 
+
   it("captures Computer Use credentials before the plugin host restores its environment", async () => {
     const capturedRuntime = captureComputerUseRuntimeFromEnvironment({
       ZCODE_CUA_PERMISSION_BROKER_SOCKET: "/tmp/deferred-cua.sock",

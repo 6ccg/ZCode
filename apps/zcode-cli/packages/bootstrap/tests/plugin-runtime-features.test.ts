@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { join } from "node:path";
 import type { PluginLoadOutcome, PluginMetadata } from "@zcode/contracts";
 import { resolvePluginRuntimeFeatures } from "../src/app/plugin-runtime-features.js";
 import { resolveBuiltInNodeReplMcpServers } from "../src/app/built-in-node-repl.js";
@@ -34,7 +35,7 @@ describe("resolvePluginRuntimeFeatures", () => {
       resolvePluginRuntimeFeatures(outcome([plugin("browser-use@zcode-plugins-official", true)])),
     ).toEqual({
       browserUse: true,
-      browserDocumentationRoot: "/tmp/plugin/docs",
+      browserDocumentationRoot: join("/tmp/plugin", "docs"),
     });
   });
 
@@ -60,7 +61,7 @@ describe("resolvePluginRuntimeFeatures", () => {
       enabledServers.node_repl?.type === "stdio"
         ? enabledServers.node_repl.args?.at(-1)
         : undefined,
-    ).toBe("/tmp/host/dist/mcp/server.js");
+    ).toBe(join("/tmp/host", "dist/mcp/server.js"));
     expect(enabledServers.browser_use).toBeUndefined();
   });
 
@@ -72,6 +73,23 @@ describe("resolvePluginRuntimeFeatures", () => {
         workingDirectory: "/workspace",
       }),
     ).toEqual({});
+  });
+
+
+  it("forwards the external Windows runtime root only with enabled Computer Use", () => {
+    for (const enabled of [true, false]) {
+      const server = resolveBuiltInNodeReplMcpServers({
+        pluginOutcome: outcome([
+          plugin("node-repl-host@zcode-plugins-official", true, "/tmp/host"),
+          plugin("browser-use@zcode-plugins-official", true),
+          plugin("computer-use@zcode-plugins-official", enabled, "/tmp/cua-plugin"),
+        ]),
+        workingDirectory: "/workspace",
+        env: { ZCODE_CUA_RUNTIME_PACKAGE_DIR: "/runtime/windows-cua" },
+      }).node_repl;
+      expect(server?.type === "stdio" ? server.env?.ZCODE_CUA_RUNTIME_PACKAGE_DIR : undefined)
+        .toBe(enabled ? "/runtime/windows-cua" : undefined);
+    }
   });
 
   it("serves Computer Use without the Browser Use package", () => {

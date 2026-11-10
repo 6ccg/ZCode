@@ -1,5 +1,7 @@
 # Computer Use
 
+
+
 Fetch this reference on demand with
 `nodeRepl.write(await agent.documentation.get("computer-use"))`. It largely repeats
 the resident Computer Use skill, so read it only when you need an argument shape or

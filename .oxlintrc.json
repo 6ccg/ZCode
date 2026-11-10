@@ -11,6 +11,8 @@
       "files": [
         // 插件市场沿用上游存量大文件，只补充目录字段投影；不为行数机械拆分安装流程。
         "**/apps/zcode-cli/packages/adapters/src/plugins/marketplace.ts",
+        // 插件发现沿用上游 800+ 行实现；这里只排除独立安装的官方 CUA，不机械拆分整套发现流程。
+        "**/apps/zcode-cli/packages/adapters/src/plugins/index.ts",
         // MCP 连接入口沿用上游存量实现；连接屏障修复不为行数重排整个 adapter。
         "**/apps/zcode-cli/packages/adapters/src/mcp/index.ts",
         // 流式 runner 沿用上游存量大文件；workflow 未知业务码重试上限只把尝试次数递给策略表，
@@ -105,7 +107,6 @@
     ".agents/skills",
     "packages/formal-proof",
     "apps/zcode-cli",
-    "packages/zcode-cua",
     "docs/electron"
   ]
 }
