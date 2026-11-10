@@ -5,11 +5,17 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 assert.equal(process.platform, "darwin");
 const bundle = resolve(process.argv[2]);
-process.env.ZCODE_CUA_RUNTIME_PACKAGE_DIR = resolve(bundle, "runtime");
+const packaged = process.argv[3] === "--packaged";
+const helperApp = packaged
+  ? resolve(bundle, "Contents/Resources/cua-helper/ZCode Computer Use.app")
+  : resolve(bundle, "helper/ZCode Computer Use.app");
+process.env.ZCODE_CUA_RUNTIME_PACKAGE_DIR = packaged
+  ? resolve(bundle, "Contents/Resources/tools/zcode-cua")
+  : resolve(bundle, "runtime");
 const scratch = await mkdtemp(resolve(tmpdir(), "zcode-cua-smoke-"));
 console.log(
   execFileSync(
-    resolve(bundle, "helper/ZCode Computer Use.app/Contents/MacOS/ZCode Computer Use"),
+    resolve(helperApp, "Contents/MacOS/ZCode Computer Use"),
     ["--cua-helper-provenance-smoke"],
     { encoding: "utf8" },
   ),
@@ -17,7 +23,7 @@ console.log(
 const server = await import("../../packages/zcode-cua/broker-server.js");
 const { callBrokerMethod } = await import("../../packages/zcode-cua/broker.js");
 const host = server.createProductCuaHelperHost({
-  bundledHelperAppPath: resolve(bundle, "helper/ZCode Computer Use.app"),
+  bundledHelperAppPath: helperApp,
   healthTimeoutMs: 30000,
   exitLogPath: resolve(scratch, "helper.log"),
 });

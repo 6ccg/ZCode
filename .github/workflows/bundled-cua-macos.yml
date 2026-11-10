@@ -41,6 +41,7 @@ jobs:
           pnpm --filter @zcode/desktop build
           cd packages/desktop
           pnpm exec electron-builder --config electron-builder.config.js --mac zip --arm64 --publish never
+          ELECTRON_RUN_AS_NODE=1 dist/mac-arm64/ZCode.app/Contents/MacOS/ZCode ../../scripts/test/bundled-cua-macos-smoke.mjs dist/mac-arm64/ZCode.app --packaged
       - uses: actions/upload-artifact@v4
         with:
           name: zcode-mac-arm64-computer-use
