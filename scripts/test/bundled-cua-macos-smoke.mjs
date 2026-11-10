@@ -1,13 +1,25 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 assert.equal(process.platform, "darwin");
 const bundle = resolve(process.argv[2]);
+const scratch = await mkdtemp(resolve(tmpdir(), "zcode-cua-smoke-"));
+console.log(
+  execFileSync(
+    resolve(bundle, "helper/ZCode Computer Use.app/Contents/MacOS/ZCode Computer Use"),
+    ["--cua-helper-provenance-smoke"],
+    { encoding: "utf8" },
+  ),
+);
 const server = await import(pathToFileURL(resolve(bundle, "runtime/broker-server.js")));
 const { callBrokerMethod } = await import(pathToFileURL(resolve(bundle, "runtime/broker.js")));
 const host = server.createProductCuaHelperHost({
   bundledHelperAppPath: resolve(bundle, "helper/ZCode Computer Use.app"),
   healthTimeoutMs: 30000,
+  exitLogPath: resolve(scratch, "helper.log"),
 });
 try {
   const first = await host.start();
@@ -42,6 +54,14 @@ try {
   assert.notEqual(second.pid, first.pid);
   await host.checkHealth();
   console.log("Mac native helper authentication, PiP transport and stop/restart passed");
+} catch (error) {
+  console.error(
+    await readFile(resolve(scratch, "helper.log"), "utf8").catch(
+      () => "Helper did not create an exit log",
+    ),
+  );
+  throw error;
 } finally {
   await host.stop();
+  await rm(scratch, { recursive: true, force: true });
 }

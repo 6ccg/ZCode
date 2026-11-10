@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { realpath, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { callBrokerMethod, mintBrokerSocketPath, probeHelperHealth } from "./broker.js";
+import { helperExitLogPathFor } from "./vendor/dist-index.js";
 
 const run = promisify(execFile);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -81,6 +82,8 @@ export function createProductCuaHelperHost(options = {}) {
       "--allow-external-broker-client-local-dev",
       "--ghost-cursor-overlay",
       "--pip-mode",
+      "--exit-log",
+      options.exitLogPath ?? helperExitLogPathFor(socketPath, env),
     ];
     await execute("/usr/bin/open", args, { env, timeout: 30000 });
     const health = await probe(socketPath, {

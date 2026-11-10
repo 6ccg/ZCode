@@ -59,7 +59,12 @@ test("Mac Host serializes concurrent starts and drains the owned PID before rest
   try {
     await writeFile(
       join(root, "host.mjs"),
-      await readFile(new URL("../cua-runtime-adapter/host-macos.js", import.meta.url)),
+      (
+        await readFile(new URL("../cua-runtime-adapter/host-macos.js", import.meta.url), "utf8")
+      ).replace(
+        'import { helperExitLogPathFor } from "./vendor/dist-index.js";',
+        'const helperExitLogPathFor = () => "/tmp/test.log";',
+      ),
     );
     await writeFile(
       join(root, "broker.js"),
