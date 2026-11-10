@@ -37,7 +37,7 @@ import {
   zcodePluginsValidateResultSchema,
 } from "@zcode/shared";
 import { getCliStorageRoot, getPluginStorageRoot } from "../src/app/paths.js";
-import { installZCodeMarketplacePlugin } from "../src/plugins.js";
+import { installZCodeMarketplacePlugin, updateZCodeMarketplacePlugin } from "../src/plugins.js";
 import {
   addPluginMarketplace,
   describePlugin,
@@ -563,6 +563,28 @@ async function writeKnownMarketplaces(
 // getCliStorageRoot 原样返回，故 pluginStorageRoot = <storageDir>/plugins）。
 describe("updatePlugin handler diagnostics", () => {
   const noopContext = {} as unknown as ZCodeProtocolAgentServerContext;
+  it("skips CUA in update-all and rejects direct UI/CLI updates before any fetch", async () => {
+    const root = await mkdtemp(join(tmpdir(), "zcode-fixed-cua-update-"));
+    const previous = process.env.ZCODE_STORAGE_DIR;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("unexpected fetch"));
+    try {
+      process.env.ZCODE_STORAGE_DIR = join(root, "cli");
+      const storageRoot = getPluginStorageRoot(getCliStorageRoot(process.env.ZCODE_STORAGE_DIR));
+      await writeTestFile(join(storageRoot, "installed_plugins.json"), JSON.stringify({ version: 1, plugins: [{
+        id: "computer-use@zcode-plugins-official", name: "computer-use", marketplace: "zcode-plugins-official",
+        version: "0.6.6", installPath: join(root, "cua"), installedAt: "fixture", scope: "user",
+      }] }));
+      const workspace = { workspacePath: root, workspaceKey: root };
+      expect((await updatePlugin(noopContext, { workspace })).installedPlugins).toEqual([]);
+      await expect(updatePlugin(noopContext, { workspace, pluginId: "computer-use@zcode-plugins-official" })).rejects.toThrow(/update the application/);
+      await expect(updateZCodeMarketplacePlugin({ pluginId: "computer-use@zcode-plugins-official" })).rejects.toThrow(/update the application/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+      if (previous === undefined) delete process.env.ZCODE_STORAGE_DIR; else process.env.ZCODE_STORAGE_DIR = previous;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
   let previousStorageDir: string | undefined;
 
   beforeEach(() => {

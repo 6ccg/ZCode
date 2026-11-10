@@ -458,9 +458,14 @@ async function stageBundledNpmRuntime() {
 }
 
 function stageSharpForNodeReplPlugin() {
-  if (!isSharpRequiredByComputerUse({ desktopPackageRoot: desktopRoot })) {
+  if (
+    !isSharpRequiredByComputerUse({
+      desktopPackageRoot: desktopRoot,
+      targetPlatform: { os: platform, arch },
+    })
+  ) {
     console.log(
-      "[prepare:agent-bundle] Computer Use package does not declare sharp, skip sharp staging",
+      "[prepare:agent-bundle] Computer Use does not require sharp for this target, skip sharp staging",
     );
     return;
   }
