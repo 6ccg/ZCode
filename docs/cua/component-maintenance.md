@@ -1,6 +1,6 @@
 # Computer Use 组件升级方法
 
-CUA 随应用整体升级。公开仓库维护接口、桥接和构建工具；闭源 JavaScript、原生二进制、下载归档及解包目录放在仓库外。当前支持 Windows x64，版本值以 `scripts/bundled-cua.mjs` 的 `CUA_RELEASE` 为准。
+CUA 随应用整体升级。公开仓库维护接口、桥接和构建工具；闭源 JavaScript、原生二进制、下载归档及解包目录放在仓库外。组件目标为 Windows x64 和 macOS arm64，版本值以 `scripts/bundled-cua.mjs` 的 `CUA_RELEASE` 为准。
 
 ## 1. 确定组件版本与原始输入
 
@@ -92,8 +92,18 @@ helper 位于 `ZCode.app/Contents/Resources/cua-helper/ZCode Computer Use.app`�
 2. 解析 Mach-O load commands、依赖库和未定义符号。当前 SEA 的 JavaScript 在 `NODE_SEA / __NODE_SEA_BLOB` 中；按嵌入长度字段提取完整 UTF-8 源码，再做语法检查。不能用 ASCII 字符串片段代替完整源码，中文注释会使这种提取方式截断。
 3. 检查 SDK/helper 的真实网络调用、下载入口、遥测回调接线及子进程命令。Node、图像库的通用网络符号、文件 URL 和签名证书地址本身不构成上报证据。
 4. 追踪 helper 的 `main` → launcher 校验 → `createPeerVerifier` → `handleAuthenticate`，并单独检查 `isPresentationPeerEligible`。当前实现校验同 UID、签名团队和进程归属；修改版的签名策略需要与 Host 准入同时适配，不能只改 broker 版本号或全局启用开发模式。
-5. SDK、公开加载入口、Host、helper 暂存与 afterPack 必须同时支持 darwin。当前主线这些组件入口仍限定 Windows，分析 SDK 可复用不代表已完成 Mac 集成。
+5. SDK、公开加载入口、Host、helper 暂存与 afterPack 必须同时支持 darwin。公开加载入口共用容器校验，Mac bridge 通过 LaunchServices 启动随包 helper，macOS 构建要求组件已重新签名。SDK 可加载和打包通过仍不能代替原生验收。
 
 修改 SEA 字节会使原签名失效，需要在 macOS 上重新签名和验签。保留系统正常的辅助功能、屏幕录制授权流程；不修改 TCC 数据库或依赖用户全局环境变量。组件仍只随整个应用更新。
+
+在 macOS arm64 上生成及验收组件：
+
+```sh
+node scripts/bundled-cua.mjs --target darwin-arm64 --archive /private/cua/ZCode-3.17.2-mac-arm64.zip --output /private/cua/bundle --sign-macos
+node scripts/test/bundled-cua-macos-smoke.mjs /private/cua/bundle
+ZCODE_CUA_BUNDLE_DIR=/private/cua/bundle pnpm bundle:desktop -- --os mac --arch arm64
+```
+
+当前私有组件保持同 UID 的本地 peer 检查，并在 broker authenticate 约束 Host authority；仅 helper 内嵌策略允许自构建签名，不将整个 SDK 变成开发模式。Host 使用 LaunchServices 为这次 helper 启动注入凭据，SDK、health 和 PiP 共用同一 admission transport。
 
 Mac 发布验收须在 macOS 上执行：最终应用与 helper 的签名/启动、错误连接方拒绝、权限未授予时的失败行为、用户正常授权后的观察/截图/输入、PiP、禁用与停止重启。网络审计同时覆盖 SDK 和原生 helper，并用本机连接作正向对照。Windows 上的静态检查或跨平台打包不能代替这些运行证据。

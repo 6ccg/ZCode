@@ -3,6 +3,7 @@
 // The wire client and shared contracts live in the vendored runtime
 // (vendor/dist-index.js); this module adds the thin helpers around it.
 import { randomBytes } from "node:crypto";
+import { join } from "node:path";
 import {
   PermissionBrokerClient,
   PermissionBrokerError,
@@ -231,9 +232,13 @@ export async function handleRequestLine(backend, line) {
 
 // 此适配产物只用于 Windows；Host 和客户端共享原生 named pipe。
 const WINDOWS_NAMED_PIPE_PREFIX = "\\\\.\\pipe\\zcode-cua-helper-";
-export function mintBrokerSocketPath() {
+export function mintBrokerSocketPath(options = {}) {
   if (process.platform === "darwin")
-    return `/tmp/zcode-cua-${process.getuid()}-${randomBytes(12).toString("hex")}.sock`;
+    // helper 要求 socket 父目录归当前用户所有，不能直接使用 root 拥有的 /tmp。
+    return join(
+      brokerRuntimeDir(options.env ?? process.env),
+      `${randomBytes(12).toString("hex")}.sock`,
+    );
   return WINDOWS_NAMED_PIPE_PREFIX + randomBytes(8).toString("hex");
 }
 

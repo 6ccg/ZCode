@@ -2,7 +2,7 @@
   "name": "@zcode/zcode-cua",
   "version": "0.6.5",
   "private": true,
-  "description": "Computer Use contracts and adapter for fixed bundled Windows components.",
+  "description": "Computer Use contracts and adapters for bundled desktop components.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
