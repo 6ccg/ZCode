@@ -11,6 +11,11 @@ Builds select it with `ZCODE_CUA_BUNDLE_DIR`. The application discovers its ship
 runtime under `resources/tools/zcode-cua`; users need no environment variables,
 post-install patches or component downloads.
 
+The adapters in `scripts/cua-runtime-adapter/` are maintained by this project
+against the current public contracts and official component version. The build
+requires the official archive and this checkout; no external patch repository,
+old tag, vendor template or installer is needed.
+
 CUA has no independent updater. Upgrade the complete application to replace its
 components. Missing bundled helpers fail explicitly; helper download paths are
 disabled. The existing local Host owns the native process and the authority used

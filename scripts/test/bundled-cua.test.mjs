@@ -3,12 +3,81 @@ import { test } from "node:test";
 import { resolve } from "node:path";
 import {
   assertPrivateOutput,
+  collectRuntimeExports,
+  collectRuntimeCalls,
   extractRuntime,
   patchWindowsHelper,
   replaceFunctionBody,
   requireHash,
   sha256,
 } from "../bundled-cua.mjs";
+import { CuaHelperLifecycleManager } from "../cua-runtime-adapter/host-lifecycle.js";
+import { CuaProductHelperWorkspaceRegistry } from "../cua-runtime-adapter/host-workspaces.js";
+
+test("derive the current runtime surface from maintained named imports and exports", () => {
+  const factory = 'export { createComputerUseRuntime } from "./vendor/dist-index.js";';
+  assert.deepEqual(
+    collectRuntimeExports([
+      factory,
+      'import { BrokerClient as Client } from "./vendor/dist-index.js";',
+    ]),
+    ["BrokerClient", "createComputerUseRuntime"],
+  );
+  assert.throws(
+    () => collectRuntimeExports([factory, 'export * from "./vendor/dist-index.js";']),
+    /explicitly/,
+  );
+  assert.throws(() => collectRuntimeExports([]), /factory/);
+});
+
+test("current public call contracts are explicit and checked independently of the old bridge", () => {
+  assert.deepEqual(
+    collectRuntimeCalls(['externalWindowsCuaFunction("./broker", "probeHelperHealth");']),
+    [{ entry: "./broker", name: "probeHelperHealth" }],
+  );
+  assert.throws(
+    () => collectRuntimeCalls(['externalWindowsCuaFunction(entry, "probeHelperHealth");']),
+    /explicitly/,
+  );
+});
+
+test("one admitted lifecycle instance survives concurrent acquire and terminal disposal", async () => {
+  let created = 0,
+    stopped = 0;
+  const stopping = Promise.withResolvers(),
+    finishStop = Promise.withResolvers();
+  const manager = new CuaHelperLifecycleManager(async () => {
+    stopped++;
+    stopping.resolve();
+    await finishStop.promise;
+  });
+  const options = { isAdmitted: () => true, create: () => ({ generation: ++created }) };
+  const [first, second] = await Promise.all([manager.acquire(options), manager.acquire(options)]);
+  assert.equal(first, second);
+  assert.equal(created, 1);
+  const disposal = manager.dispose();
+  assert.equal(manager.disposed, true);
+  await stopping.promise;
+  finishStop.resolve();
+  await disposal;
+  assert.equal(stopped, 1);
+  assert.equal(await manager.acquire(options), undefined);
+});
+
+test("workspace admission keeps identities distinct even when filesystem paths match", () => {
+  const registry = new CuaProductHelperWorkspaceRegistry();
+  registry.setEnabled(
+    { workspaceKey: "first", workspaceIdentity: "first", workspacePath: "same" },
+    true,
+  );
+  registry.setEnabled(
+    { workspaceKey: "second", workspaceIdentity: "second", workspacePath: "same" },
+    true,
+  );
+  assert.equal(registry.snapshot().length, 2);
+  registry.setEnabled({ workspaceKey: "first" }, false);
+  assert.deepEqual(registry.snapshot(), [{ workspacePath: "same", workspaceIdentity: "second" }]);
+});
 
 test("private vendor output cannot enter the public checkout", () => {
   assert.throws(
@@ -37,7 +106,10 @@ test("function patch is bounded even with nested braces and stops on version dri
 });
 
 test("extraction removes executable helper download paths", () => {
-  const source = `// ../../../../packages/zcode-cua/dist/index.js
+  const source = `const currentBundlerPrelude = true;
+// ../../../../node_modules/unrelated/index.js
+throw new Error("unrelated preceding application code");
+// ../../../../packages/zcode-cua/dist/index.js
 class Broker { constructor(options) {
     this.operationHooks = options.operationHooks;
 } }
@@ -60,14 +132,14 @@ function plan() {
 }
 // ../../../../packages/shared/src/browser-use/command-metadata.ts
 throw new Error("unrelated application code");`;
-  const reference =
-    'const prelude = true;\nimport { homedir as homedir2 } from "node:os";\nexport { plan };';
-  const result = extractRuntime(source, reference);
+  const result = extractRuntime(source, ["plan"]);
   assert.doesNotMatch(result, /fetch\(|kind: "download"|unrelated application code/);
   assert.match(result, /if \(!bundledAppPath\) throw/);
   assert.match(result, /export \{ plan \}/);
+  assert.match(result, /currentBundlerPrelude/);
+  assert.doesNotMatch(result, /unrelated preceding application code/);
   assert.throws(
-    () => extractRuntime(source.replace("dist/index.js", "dist/renamed.js"), reference),
+    () => extractRuntime(source.replace("dist/index.js", "dist/renamed.js"), ["plan"]),
     /boundaries/,
   );
 });

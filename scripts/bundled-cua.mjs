@@ -2,19 +2,19 @@
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { cp, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import ts from "typescript";
 
 const run = promisify(execFile);
 const checkout = resolve(import.meta.dirname, "..");
+const adapterRoot = resolve(import.meta.dirname, "cua-runtime-adapter");
 export const CUA_RELEASE = Object.freeze({
   version: "3.17.2",
   cuaVersion: "0.6.5",
   electronVersion: "44.7.0",
-  patchCommit: "c81950cb6dbdb4e1529879174632b3909cca26f8",
   serverSha256: "2ec51dbeea3449812d04499f1d0c6898346e432c8d94280d855459d29fae68b5",
   targets: {
     "win32-x64": {
@@ -85,7 +85,63 @@ export function replaceFunctionBody(source, name, body) {
   return source.slice(0, node.getStart(ast)) + `{\n${body}\n}` + source.slice(node.end);
 }
 
-export function extractRuntime(server, reference) {
+export function collectRuntimeExports(sources) {
+  const names = new Set();
+  for (const source of sources) {
+    const ast = ts.createSourceFile(
+      "adapter.js",
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.JS,
+    );
+    for (const node of ast.statements) {
+      if (!ts.isImportDeclaration(node) && !ts.isExportDeclaration(node)) continue;
+      if (node.moduleSpecifier?.text !== "./vendor/dist-index.js") continue;
+      const bindings = ts.isImportDeclaration(node)
+        ? node.importClause?.namedBindings
+        : node.exportClause;
+      if (!bindings || (!ts.isNamedImports(bindings) && !ts.isNamedExports(bindings))) {
+        throw new Error("CUA adapter must name its official runtime dependencies explicitly");
+      }
+      for (const item of bindings.elements) names.add(item.propertyName?.text ?? item.name.text);
+    }
+  }
+  if (!names.has("createComputerUseRuntime"))
+    throw new Error("CUA runtime factory export is missing");
+  return [...names].sort();
+}
+
+export function collectRuntimeCalls(sources) {
+  const calls = [];
+  for (const source of sources) {
+    const ast = ts.createSourceFile(
+      "contract.js",
+      source,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.JS,
+    );
+    const visit = (node) => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "externalWindowsCuaFunction"
+      ) {
+        const [entry, name] = node.arguments;
+        if (!entry || !name || !ts.isStringLiteral(entry) || !ts.isStringLiteral(name)) {
+          throw new Error("CUA public runtime calls must name their entry and function explicitly");
+        }
+        calls.push({ entry: entry.text, name: name.text });
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(ast);
+  }
+  return calls;
+}
+
+export function extractRuntime(server, exports) {
   const startMarker = "// ../../../../packages/zcode-cua/dist/index.js";
   const endMarker = "// ../../../../packages/shared/src/browser-use/command-metadata.ts";
   const start = server.indexOf(startMarker);
@@ -93,11 +149,18 @@ export function extractRuntime(server, reference) {
   if (start < 0 || end <= start || server.indexOf(startMarker, start + 1) !== -1) {
     throw new Error("CUA official runtime boundaries changed");
   }
-  const preludeEnd = reference.indexOf("import { homedir as homedir2 }");
-  const exportsStart = reference.lastIndexOf("\nexport {");
-  if (preludeEnd < 0 || exportsStart < 0) throw new Error("CUA patch template changed");
+  const preludeEnd = server.indexOf("\n// ../../../../node_modules/");
+  if (preludeEnd < 0 || preludeEnd >= start)
+    throw new Error("CUA official bundler prelude changed");
+  // 当前官方包的 HTTP transport 引用了外部 Express；本地工具运行时不使用 HTTP transport。
+  // 保留可选依赖查询，不能把整个官方 Agent 或其他插件的实现带入 CUA。
+  const optionalExpress =
+    '\nvar require_express2 = () => { try { return require("express"); } catch { return {}; } };\n';
   let result =
-    reference.slice(0, preludeEnd) + server.slice(start, end) + reference.slice(exportsStart);
+    server.slice(0, preludeEnd) +
+    optionalExpress +
+    server.slice(start, end) +
+    `\nexport { ${exports.join(", ")} };\n`;
   // 原版开发路径允许缺失组件后联网下载；固定随包组件不得保留这个可执行分支。
   const noDownload =
     'throw new Error("CUA is bundled with this application; update the application to replace it. Helper downloads are disabled.");';
@@ -138,25 +201,32 @@ export function extractRuntime(server, reference) {
   return result;
 }
 
-async function pinnedPatchFile(patchRoot, name) {
-  const { stdout } = await run(
-    "git",
-    ["-C", patchRoot, "show", `${CUA_RELEASE.patchCommit}:runtimes/zcode-cua/${name}`],
-    { maxBuffer: 8 * 1024 * 1024 },
-  );
-  return stdout;
-}
-
-export async function prepareCuaBundle({ resources, patchRoot, output, target }) {
+export async function prepareCuaBundle({ resources, output, target }) {
   assertPrivateOutput(output);
   if (!CUA_RELEASE.targets[target]) throw new Error(`Unsupported fixed CUA target: ${target}`);
   const server = await readFile(
     resolve(resources, "glm/packages/node-repl-host/dist/mcp/server.js"),
   );
   requireHash(server, CUA_RELEASE.serverSha256, "official node-repl-host");
-  // 使用固定 Git 对象读取桥接层，避免把工作目录中已被修改的补丁当成固定输入。
-  const reference = await pinnedPatchFile(patchRoot, "vendor/dist-index.js");
-  const manifest = JSON.parse(await pinnedPatchFile(patchRoot, "package.json"));
+  const contractRoot = resolve(checkout, "packages/zcode-cua");
+  const contract = JSON.parse(await readFile(resolve(contractRoot, "package.json"), "utf8"));
+  const application = JSON.parse(await readFile(resolve(checkout, "package.json"), "utf8"));
+  if (application.version !== CUA_RELEASE.version || contract.version !== CUA_RELEASE.cuaVersion) {
+    throw new Error(
+      "Update the CUA adaptations for the current application and CUA contract versions",
+    );
+  }
+  const manifest = {
+    name: contract.name,
+    version: CUA_RELEASE.cuaVersion,
+    type: "module",
+    private: true,
+    license: "SEE LICENSE IN NOTICE",
+    zcodeCuaBundledTarget: target,
+    exports: Object.fromEntries(
+      Object.entries(contract.exports).map(([name, value]) => [name, { import: value.import }]),
+    ),
+  };
   const runtimeRoot = resolve(output, "runtime");
   try {
     await stat(output);
@@ -165,32 +235,47 @@ export async function prepareCuaBundle({ resources, patchRoot, output, target })
     if (error.code !== "ENOENT") throw error;
   }
   await mkdir(resolve(runtimeRoot, "vendor"), { recursive: true });
-  for (const entry of Object.values(manifest.exports)) {
-    const name = entry.import.slice(2);
-    let source = await pinnedPatchFile(patchRoot, name);
-    if (name === "broker.js") {
-      source = replaceOnce(
-        source,
-        "    timeoutMs: args.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,",
-        "    timeoutMs: args.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,\n    authenticateParams: { pluginAuthority: args.pluginAuthority ?? process.env.ZCODE_CUA_PLUGIN_AUTHORITY },",
-      );
-      source = replaceOnce(
-        source,
-        "        timeoutMs: perTryTimeoutMs,",
-        "        timeoutMs: perTryTimeoutMs,\n        pluginAuthority: options.pluginAuthority,",
-      );
-    }
+  const adapters = await Promise.all(
+    (await readdir(adapterRoot))
+      .filter((name) => name.endsWith(".js"))
+      .map(async (name) => ({ name, source: await readFile(resolve(adapterRoot, name), "utf8") })),
+  );
+  for (const { name, source } of adapters) {
     await writeFile(resolve(runtimeRoot, name), source);
   }
-  manifest.version = CUA_RELEASE.cuaVersion;
-  manifest.license = "SEE LICENSE IN NOTICE";
-  manifest.zcodeCuaBundledTarget = target;
   await writeFile(resolve(runtimeRoot, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
-  const vendor = extractRuntime(server.toString("utf8"), reference);
+  const vendor = extractRuntime(
+    server.toString("utf8"),
+    collectRuntimeExports(adapters.map((item) => item.source)),
+  );
   await writeFile(resolve(runtimeRoot, "vendor/dist-index.js"), vendor);
+  await run(process.execPath, ["--check", resolve(runtimeRoot, "vendor/dist-index.js")]);
+  const publicSources = await Promise.all(
+    (await readdir(contractRoot))
+      .filter((name) => name.endsWith(".js"))
+      .map((name) => readFile(resolve(contractRoot, name), "utf8")),
+  );
+  const entries = Object.fromEntries(
+    Object.entries(manifest.exports).map(([name, value]) => [
+      name,
+      pathToFileURL(resolve(runtimeRoot, value.import)).href,
+    ]),
+  );
+  // 校验当前开源入口真正调用的函数，而不只是旧桥接模块能 import；升级接口不匹配时在构建阶段停止。
+  await run(process.execPath, [
+    "--input-type=module",
+    "-e",
+    `
+    const {entries,calls}=JSON.parse(process.argv[1]);
+    const modules=new Map();
+    for(const [name,url] of Object.entries(entries)) modules.set(name,await import(url));
+    for(const {entry,name} of calls) if(typeof modules.get(entry)?.[name]!=="function") throw new Error("CUA adapter is missing current interface: "+entry+"#"+name);
+  `,
+    JSON.stringify({ entries, calls: collectRuntimeCalls(publicSources) }),
+  ]);
   await writeFile(
-    resolve(output, "PATCH-LICENSE"),
-    (await run("git", ["-C", patchRoot, "show", `${CUA_RELEASE.patchCommit}:LICENSE`])).stdout,
+    resolve(output, "ADAPTER-LICENSE"),
+    await readFile(resolve(adapterRoot, "LICENSE")),
   );
   if (target === "win32-x64") {
     const helper = resolve(resources, "tools/cua-helper");
@@ -232,7 +317,7 @@ export async function prepareCuaBundle({ resources, patchRoot, output, target })
         cuaVersion: CUA_RELEASE.cuaVersion,
         electronVersion: CUA_RELEASE.electronVersion,
         target,
-        patchCommit: CUA_RELEASE.patchCommit,
+        adapter: "project-maintained",
         officialArchiveSha256: CUA_RELEASE.targets[target].sha256,
         officialServerSha256: CUA_RELEASE.serverSha256,
         patchedRuntimeSha256: sha256(Buffer.from(vendor)),
@@ -245,7 +330,7 @@ export async function prepareCuaBundle({ resources, patchRoot, output, target })
   await writeFile(resolve(runtimeRoot, "bundle-manifest.json"), bundleManifest);
   await writeFile(
     resolve(runtimeRoot, "NOTICE"),
-    `Computer Use components extracted from ZCode ${CUA_RELEASE.version}.\nOfficial runtime/native components retain their original rights; this repository's Apache-2.0 license does not cover them.\nBridge adapted from luxi233/ZcodePro ${CUA_RELEASE.patchCommit}.\nThe MIT license below applies to the bridge only:\n\n${await readFile(resolve(output, "PATCH-LICENSE"), "utf8")}`,
+    `Computer Use components extracted from ZCode ${CUA_RELEASE.version}.\nOfficial runtime/native components retain their original rights; this repository's Apache-2.0 license does not cover them.\nBuild adaptations are maintained by this project. Bridge portions adapted from luxi233/ZcodePro; its installers, old vendor and old helper are not used.\nThe MIT license below applies to the bridge only:\n\n${await readFile(resolve(output, "ADAPTER-LICENSE"), "utf8")}`,
   );
   return output;
 }
@@ -256,7 +341,6 @@ async function main() {
       target: { type: "string" },
       output: { type: "string" },
       resources: { type: "string" },
-      "patch-root": { type: "string" },
       archive: { type: "string" },
       "7zip": { type: "string", default: "7z" },
     },
@@ -264,7 +348,7 @@ async function main() {
   const { target, output, archive } = values;
   assertPrivateOutput(output ?? "");
   const pin = CUA_RELEASE.targets[target];
-  if (!pin || !values["patch-root"]) throw new Error("Require --target, --output and --patch-root");
+  if (!pin) throw new Error("Require a supported --target and --output");
   let resources = values.resources;
   if (archive) {
     assertPrivateOutput(archive);
@@ -284,16 +368,26 @@ async function main() {
     }
     requireHash(bytes, pin.sha256, "archive");
     const extracted = `${archive}.extracted`;
-    await run(values["7zip"], ["x", "-y", `-o${extracted}`, archive], {
-      maxBuffer: 4 * 1024 * 1024,
-    });
+    await run(
+      values["7zip"],
+      [
+        "x",
+        "-y",
+        `-o${extracted}`,
+        archive,
+        `${pin.resources}/glm/packages/node-repl-host/dist/mcp/server.js`,
+        `${pin.resources}/tools/cua-helper/*`,
+      ],
+      {
+        maxBuffer: 4 * 1024 * 1024,
+      },
+    );
     resources = resolve(extracted, pin.resources);
   }
   if (!resources) throw new Error("Require --archive or --resources");
   console.log(
     await prepareCuaBundle({
       resources,
-      patchRoot: values["patch-root"],
       output,
       target,
     }),

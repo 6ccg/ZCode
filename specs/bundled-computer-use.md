@@ -4,7 +4,7 @@
 
 - CUA 是应用的固定组件；不提供独立检查更新、下载、补丁或自动替换入口。
 - 固定范围包含官方 `computer-use` 的 SDK/技能包。官方市场 CDN 不能覆盖随包条目；单独更新该 canonical id 明确拒绝，批量更新跳过，发现时不加载用户安装记录中的替代版本。其他市场的同名插件不受影响。
-- 构建者取得固定版本的官方发行包，验证哈希，提取 CUA runtime/helper，应用有版本约束的补丁后打包。用户仅更新整个应用。
+- 构建者取得与本工程对应的官方发行包，验证哈希，提取当前 CUA runtime/helper，应用本项目维护的适配后打包。旧补丁项目仅作为实现思路参考，不是构建输入。用户仅更新整个应用。
 - 非开源 JS、原生组件、原始发行包和提取目录全部留在公开工作区之外；仓库只保留清单、适配和构建工具。
 - 仅取 Computer Use 的依赖闭包，不导入其他官方联网插件、登录、市场或遥测实现。
 - 保留 CUA 设置开关和正常系统权限授权；关闭时不得发现或调用 CUA。模型 API 的正常传输继续沿用现有配置。
@@ -17,7 +17,7 @@ sequenceDiagram
     participant P as 仓库外私有目录
     participant A as 软件发布包
     participant H as 现有本地 Host
-    B->>P: 校验固定官方归档和补丁提交
+    B->>P: 校验与工程版本对应的官方归档
     B->>P: 提取当前版本 JS / helper / 依赖并应用补丁
     B->>A: 暂存并验证固定组件
     H->>A: 设置启用后加载本地组件
@@ -31,7 +31,9 @@ sequenceDiagram
 
 ## 固定版本及补丁
 
-当前目标为 ZCode 3.17.2、CUA 0.6.5、Electron 44.7.0、Windows x64。补丁项目固定到 luxi233/ZcodePro 的 c81950cb6dbdb4e1529879174632b3909cca26f8；只复用其公开桥接层，不复用旧 vendor runtime 或旧 native helper。
+当前工程与官方组件目标为 ZCode 3.17.2、CUA 0.6.5、Electron 44.7.0、Windows x64。参考 [luxi233/ZcodePro](https://github.com/luxi233/ZcodePro) 的方法：把开源占位入口接到官方发行包的真实实现，再适配本地 helper 启动与 broker。其旧版本、标签、vendor runtime 和 native helper 均不作为本工程的构建依赖。
+
+本项目在 `scripts/cua-runtime-adapter/` 维护桥接代码，按当前开源包的公共接口生成导出面。SDK 的 bundler 前导与实际实现均从当前官方产物读取，不再读取旧补丁仓库的模板或安装器。Windows Host 桥接只保留本工程实际使用的生命周期、workspace admission、MCP 与 refresh-marker；不带入旧的 macOS 安装链。
 
 官方 node-repl-host bundle 中的 CUA 分发段作为当前 JS 实现；明确的段边界和未修改输入哈希必须匹配后才提取。补丁去除 helper 下载分支；缺少随包组件时明确失败，不能转到 CDN 或已有其他版本。
 
@@ -39,7 +41,8 @@ sequenceDiagram
 
 ## 验收
 
-- 错误归档、版本或补丁提交不得生成可用组件；私有输出必须在 Git 工作区外。
+- 错误归档、版本或导出契约不得生成可用组件；私有输出必须在 Git 工作区外。
+- 构建只需官方发行包和本工程源码，不需要旧补丁仓库；动态加载所有公共导出，验证当前 SDK 的依赖闭包与认证契约。
 - 提取当前官方 runtime，动态模块闭包可以加载；运行时 helper 下载入口明确失败且网络请求数为零。
 - Windows：在目标 Electron 下加载 addon，启动、认证、health、观察、截图、对专用测试窗口输入、停止及重启；禁止用 mock 或改写 manifest 的方式代替。
 - 发布包已含全部资源，无环境变量、安装后补丁或首次下载要求。根 typecheck、lint、相关 CUA/工程测试必须报告实际结果。
@@ -48,10 +51,10 @@ sequenceDiagram
 
 ## 构建与检查入口
 
-构建机预装固定 Node/pnpm 和解包工具，补丁仓库放在公开 checkout 外。Windows 例：
+构建机预装固定 Node/pnpm 和解包工具。Windows 例：
 
 ```powershell
-node scripts/bundled-cua.mjs --target win32-x64 --archive D:/private/cua/ZCode-3.17.2-win-x64.exe --patch-root D:/private/ZcodePro --output D:/private/cua/3.17.2-win32-x64 --7zip 7z
+node scripts/bundled-cua.mjs --target win32-x64 --archive D:/private/cua/ZCode-3.17.2-win-x64.exe --output D:/private/cua/3.17.2-win32-x64 --7zip 7z
 $env:ZCODE_CUA_BUNDLE_DIR = 'D:/private/cua/3.17.2-win32-x64'
 pnpm bundle:desktop -- --os win --arch x64
 pnpm exec tsx scripts/test/bundled-cua-windows-smoke.mts D:/private/release/win-unpacked/resources
