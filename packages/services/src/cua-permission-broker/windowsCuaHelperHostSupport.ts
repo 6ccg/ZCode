@@ -67,7 +67,8 @@ export const defaultSocketPathFactory = mintBrokerSocketPath;
 export const defaultHealthProbe = (
   socketPath: string,
   timeoutMs: number,
-): Promise<HelperHealth> => probeHelperHealth(socketPath, { timeoutMs });
+  pluginAuthority?: string,
+): Promise<HelperHealth> => probeHelperHealth(socketPath, { timeoutMs, pluginAuthority });
 
 export class WindowsCuaChildLifecycle {
   constructor(private readonly logger: ServiceLogger) {}
@@ -241,4 +242,25 @@ export function isExactHealthPid(
 
 export function asError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+/**
+ * 外部 Windows bridge 不负责 standalone 启动；在已授权的 MCP 准备边界复用托管 host。
+ * 生命周期仍由调用方持有，start 期间 stop/替换后不得返回陈旧 resolver。
+ */
+export async function selectWindowsCuaHelperResolver<
+  Helper extends { host: { start(): Promise<unknown> }; resolver: unknown },
+>(options: {
+  bridgeEnabled: boolean;
+  acquire(): Promise<Helper | undefined>;
+  peek(): Helper | undefined;
+  isCurrent(helper: Helper): boolean;
+}): Promise<Helper["resolver"] | undefined> {
+  const helper = options.bridgeEnabled ? await options.acquire() : options.peek();
+  if (!helper || !options.isCurrent(helper)) return undefined;
+  if (options.bridgeEnabled) {
+    await helper.host.start();
+    if (!options.isCurrent(helper)) return undefined;
+  }
+  return helper.resolver;
 }

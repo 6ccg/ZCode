@@ -18,6 +18,16 @@ Windows 沿用 macOS 已验证的“Agent 只连接 broker、Helper 独立持有
 
 `@zcode/zcode-cua` 是 Helper JavaScript、native source、addon 与版本校验的唯一包身份；不得再为同一 Git 提交声明 helper-runtime alias。macOS/Windows CI 必须从 canonical 包重建目标架构 addon，缺少 `binding.gyp` 或对应平台源码时 fail closed。
 
+本 fork 的显式本地输入也支持已经打包好的 `@zcode/zcode-cua-helper-runtime` 目录，
+用于检查和暂存现有 Windows helper，而不是增加另一个源码依赖身份。它必须保留
+原有 manifest、哈希、Electron 版本和连接行为；版本不同需要原生验证，不重写为
+目标版本。资源适配本身不代表 CUA 已能运行。源码的 Windows 专用 bridge 另外要求
+`ZCODE_CUA_RUNTIME_PACKAGE_DIR` 指向完整 JavaScript runtime，接入现有 Host/broker，
+并经独立能力门禁暂存到 `resources/tools/zcode-cua`；不会解除 macOS 的占位门禁。
+当前 fork 没有执行下文历史设备验收，Electron 41.0.3 → 44.7.0 仍待 Windows 原生验证。
+接线与边界见 [Windows runtime bridge](../../specs/bundled-computer-use.md)。
+范围、测试与未完成项见 [预打包 Helper 适配](../../specs/bundled-computer-use.md)。
+
 ```text
 构建期
 
@@ -196,6 +206,9 @@ staging manifest（未签名字节 hash）
 `test:engineering:affected` 失败必须单独列出，不得把它们伪装成 CUA 回归。
 
 ## 本地产品验收记录（2026-07-29）
+
+以下是继承自参考实现的历史记录，不是本 fork 本轮的测试结果。本轮只在 Linux
+执行静态/夹具测试，不得据此宣称已完成 Windows 产品或签名验收。
 
 Windows `--dir` 验收必须显式加载仓库的非默认配置文件名；裸跑
 `electron-builder --win --x64 --dir` 不会加载 `electron-builder.config.js`，会在

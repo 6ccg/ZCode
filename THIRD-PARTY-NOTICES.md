@@ -50412,3 +50412,11 @@ their own copyright notices and license terms:
 
 
 ````
+
+## Bundled Windows Computer Use
+
+Windows distributions may include the fixed CUA 0.6.5 runtime and native helper
+from official ZCode 3.17.2. These proprietary components retain their original
+rights and are not licensed by this repository's Apache-2.0 license. The bridge
+is adapted from luxi233/ZcodePro (MIT); its original license is included in the
+packaged runtime's NOTICE. No ZcodePro installer is executed or shipped.

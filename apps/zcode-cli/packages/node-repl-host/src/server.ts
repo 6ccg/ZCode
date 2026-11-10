@@ -456,6 +456,7 @@ export function captureComputerUseRuntimeFromEnvironment(
   const socketPath = env.ZCODE_CUA_PERMISSION_BROKER_SOCKET?.trim();
   if (!socketPath) return undefined;
   return createComputerUseRuntime({
+    env,
     brokerSocketPath: socketPath,
     refreshMarkerPath: env.ZCODE_CUA_PERMISSION_BROKER_REFRESH_MARKER?.trim(),
   });

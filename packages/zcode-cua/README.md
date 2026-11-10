@@ -1,9 +1,25 @@
 # @zcode/zcode-cua
 
-API-compatible placeholder package for Computer Use. This build ships without
-Computer Use: every runtime surface (Computer Use runtime, broker RPC, Helper
-install/launch/verify, PiP session client, native addon loader) reports
-**unavailable** and fails closed, predicates about official CUA frames are
-`false`, and permission ports keep their privacy fail-closed semantics.
+This public package provides contracts and an adapter for fixed bundled Computer
+Use components. Vendor JS/native files stay outside the public checkout.
 
-License: Apache-2.0.
+## Distribution
+
+The build tool in `scripts/bundled-cua.mjs` extracts pinned official 3.17.2/CUA
+0.6.5 components, applies versioned adaptations and prepares a private bundle.
+Builds select it with `ZCODE_CUA_BUNDLE_DIR`. The application discovers its shipped
+runtime under `resources/tools/zcode-cua`; users need no environment variables,
+post-install patches or component downloads.
+
+CUA has no independent updater. Upgrade the complete application to replace its
+components. Missing bundled helpers fail explicitly; helper download paths are
+disabled. The existing local Host owns the native process and the authority used
+by admitted clients. Settings and normal OS privacy permissions still apply.
+
+Windows x64 uses the official Electron 44.7.0 helper. Component acquisition/build
+checks and native UI acceptance are separate checks; see `specs/bundled-computer-use.md`.
+
+Run deterministic tests: `pnpm --filter @zcode/zcode-cua test:source`.
+Without a private payload, `zcodeCuaPlaceholder` remains true and real calls stay
+unavailable. The experimental independent AX backend has been removed.
+License for this source package: Apache-2.0.
