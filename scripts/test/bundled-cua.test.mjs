@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
 import {
   assertPrivateOutput,
   collectRuntimeExports,
@@ -10,9 +11,23 @@ import {
   replaceFunctionBody,
   requireHash,
   sha256,
+  CUA_RELEASE,
 } from "../bundled-cua.mjs";
 import { CuaHelperLifecycleManager } from "../cua-runtime-adapter/host-lifecycle.js";
 import { CuaProductHelperWorkspaceRegistry } from "../cua-runtime-adapter/host-workspaces.js";
+
+test("pinned components follow the application, Electron and public CUA contract versions", async () => {
+  const manifest = async (path) =>
+    JSON.parse(await readFile(new URL(path, import.meta.url), "utf8"));
+  const [workspace, desktop, cua] = await Promise.all([
+    manifest("../../package.json"),
+    manifest("../../packages/desktop/package.json"),
+    manifest("../../packages/zcode-cua/package.json"),
+  ]);
+  assert.equal(CUA_RELEASE.version, workspace.version);
+  assert.equal(CUA_RELEASE.electronVersion, desktop.devDependencies.electron);
+  assert.equal(CUA_RELEASE.cuaVersion, cua.version);
+});
 
 test("derive the current runtime surface from maintained named imports and exports", () => {
   const factory = 'export { createComputerUseRuntime } from "./vendor/dist-index.js";';

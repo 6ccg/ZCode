@@ -4,6 +4,8 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
 assert.equal(process.platform, "win32");
@@ -85,6 +87,71 @@ try {
       timeoutMs: 2000,
     }),
   );
+  const require = createRequire(
+    new URL("../../apps/zcode-cli/packages/node-repl-host/package.json", import.meta.url),
+  );
+  const { Client } = require("@modelcontextprotocol/client");
+  const { StdioClientTransport } = require("@modelcontextprotocol/client/stdio");
+  const mcp = new Client(
+    { name: "packaged-cua-acceptance", version: "1.0.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+  );
+  const childEnv = {
+    ...process.env,
+    ELECTRON_RUN_AS_NODE: "1",
+    ZCODE_CUA_PERMISSION_BROKER_SOCKET: initial.socketPath,
+    ZCODE_CUA_PLUGIN_AUTHORITY: initial.pluginAuthority,
+    ZCODE_CUA_RUNTIME_PACKAGE_DIR: join(resources, "tools/zcode-cua"),
+    ZCODE_CUA_PLUGIN_ROOT: join(resources, "glm/packages/zcode-cua-plugin"),
+  };
+  const transport = new StdioClientTransport({
+    command: resolve(resources, "..", executables[0]!),
+    args: [join(resources, "glm/packages/node-repl-host/dist/mcp/server.js")],
+    env: childEnv,
+    stderr: "pipe",
+  });
+  try {
+    await mcp.connect(transport);
+    const clientUrl = pathToFileURL(
+      join(resources, "glm/packages/zcode-cua-plugin/scripts/computer-use-client.mjs"),
+    ).href;
+    const code = [
+      `const {setupComputerUseRuntime} = await import(${JSON.stringify(clientUrl)});`,
+      "await setupComputerUseRuntime({globals:globalThis});",
+      `const app = await agent.computerUse.getApp({pid:${pid}});`,
+      "const shot = await app.getAXStateAndScreenshot();",
+      'if (!shot.state.includes("CUA test input") || !shot.screenshot?.byteLength) throw new Error("Own fixture observation/screenshot missing");',
+      'nodeRepl.write("OWN_CUA_SCREENSHOT_OK");',
+    ].join("\n");
+    const result = await mcp.callTool({
+      name: "js",
+      arguments: { code, title: "Verify bundled Computer Use" },
+      _meta: {
+        "com.zcode/request-context": {
+          session_id: "packaged-cua-acceptance",
+          runtime_scope: "main",
+          workspace_path: scratch,
+          workspace_identity: scratch,
+          turn_id: "native-check",
+        },
+      },
+    });
+    const diagnostics = result.content
+      .filter((item: { type: string }) => item.type === "text")
+      .map((item: { text: string }) => item.text)
+      .join("\n");
+    assert.ok(!result.isError, diagnostics);
+    assert.match(diagnostics, /OWN_CUA_SCREENSHOT_OK/);
+    assert.ok(
+      result.content.some((item: { type: string }) => item.type === "image"),
+      "MCP must preserve the own-window screenshot",
+    );
+    console.log(
+      "Packaged node_repl MCP and bundled Computer Use SDK observation/screenshot passed.",
+    );
+  } finally {
+    await mcp.close();
+  }
   const permissions = await callBrokerMethod<{ accessibility: string }>({
     socketPath: initial.socketPath,
     method: "permission_status",

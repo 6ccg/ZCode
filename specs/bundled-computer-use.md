@@ -34,20 +34,22 @@ sequenceDiagram
 
 ## 版本与构建
 
-当前组件目标为 Windows x64 和 macOS arm64，应用 3.17.2、CUA 0.6.5、Electron 44.7.0。版本、来源归档与输入哈希集中在 `CUA_RELEASE`；构建清单记录实际输入和输出哈希。归档中的 CUA 段边界及公共导出必须与当前接口匹配，升级应用时一并验证。
+当前组件目标为 Windows x64 和 macOS arm64，应用 3.18.0、CUA 0.6.5、Electron 44.7.0。版本、来源归档与输入哈希集中在 `CUA_RELEASE`；构建清单记录实际输入和输出哈希。归档中的 CUA 段边界及公共导出必须与当前接口匹配，升级应用时一并验证。
 
-构建只选取 CUA 及其运行依赖。组件中的 helper 下载入口不可用，缺少随包资源时明确报错。helper 的 broker authenticate 要求 Host 签发的 authority，缺失或错误凭据必须拒绝。资源准备和 afterPack 复用同一组版本、架构、路径与哈希校验。
+构建只选取 CUA 及其运行依赖。Windows 归档按内嵌 7z 载荷提取，不依赖解包工具对 EXE 的自动识别。组件中的 helper 下载入口不可用，缺少随包资源时明确报错。helper 的 broker authenticate 要求 Host 签发的 authority，缺失或错误凭据必须拒绝。资源准备和 afterPack 复用同一组版本、架构、路径与哈希校验。
 
 构建机预装项目要求的 Node/pnpm 和解包工具，输入与输出目录位于公开工作区之外：
 
 ```powershell
-node scripts/bundled-cua.mjs --target win32-x64 --archive D:/private/cua/ZCode-3.17.2-win-x64.exe --output D:/private/cua/3.17.2-win32-x64 --7zip 7z
-$env:ZCODE_CUA_BUNDLE_DIR = 'D:/private/cua/3.17.2-win32-x64'
+node scripts/bundled-cua.mjs --target win32-x64 --archive D:/private/cua/ZCode-3.18.0-win-x64.exe --output D:/private/cua/3.18.0-win32-x64 --7zip 7z
+$env:ZCODE_CUA_BUNDLE_DIR = 'D:/private/cua/3.18.0-win32-x64'
 pnpm bundle:desktop -- --os win --arch x64
 pnpm exec tsx scripts/test/bundled-cua-windows-smoke.mts D:/private/release/win-unpacked/resources
 ```
 
 构建变量仅供构建机选择组件，最终用户无需设置。
+
+GitHub Actions 在 `main` 推送及手动触发时构建两个平台，版本和官方归档路径从 `CUA_RELEASE` 读取。私有组件在 runner 临时目录生成，最终只上传 Windows 解压即用 ZIP、Mac `.app` ZIP 和构建元数据；不生成安装器或 DMG。构建显式关闭遥测端点和官方更新。上传前须验证最终包的原生组件、版本与实际构建提交，并记录 ZIP 的 SHA-256。两端均成功后才发布 Release，Release 标签保留实际构建提交。
 
 ## macOS 组件接入
 

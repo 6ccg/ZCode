@@ -12,24 +12,24 @@ const run = promisify(execFile);
 const checkout = resolve(import.meta.dirname, "..");
 const adapterRoot = resolve(import.meta.dirname, "cua-runtime-adapter");
 export const CUA_RELEASE = Object.freeze({
-  version: "3.17.2",
+  version: "3.18.0",
   cuaVersion: "0.6.5",
   electronVersion: "44.7.0",
-  serverSha256: "2ec51dbeea3449812d04499f1d0c6898346e432c8d94280d855459d29fae68b5",
+  serverSha256: "0dc72591f6600b558ae934a84a7378eda59d98d5c8a1944115a79afa8cbace15",
   targets: {
     "darwin-arm64": {
-      file: "ZCode-3.17.2-mac-arm64.zip",
+      file: "ZCode-3.18.0-mac-arm64.zip",
       directory: "macos-arm64",
-      sha256: "7f95b42d2066d4633c95d117c67f124a1499d9832060a58ccd53d0a43f4a06ab",
-      helperSha256: "36ba7e600dce3cc715bdf278459fedb89eb9622dfbd8278abe9811f0717cad2b",
+      sha256: "7ceb236804c6ef6f4326202aa6f0b71bfcff3f923d7b212882d19b868ed1dabf",
+      helperSha256: "dce86bbf706190d98637d05a188e8bd40f58c18a0adf94f0540378a780bb575e",
       resources: "ZCode.app/Contents/Resources",
     },
     "win32-x64": {
-      file: "ZCode-3.17.2-win-x64.exe",
+      file: "ZCode-3.18.0-win-x64.exe",
       directory: "windows-x64",
-      sha256: "41edab524e9636451ba9db3f4d78b68d166e5602401267a14e63317f89c43e48",
+      sha256: "54514071554b784f19556902e8c29083ef52c5e27846e6dfb45d0ba7880e6dbc",
       helperEntrySha256: "fccf66e0d28a251e24e1bf8fffe6498eb3ff66b40819d4b7fa5cba63d56e9d9c",
-      helperAddonSha256: "11f8bc9c053636fd7199a1e5802a82df652db6bf5ae232165bc530da7530b534",
+      helperAddonSha256: "5161ee7c2aecf99579ba9d244c9ec3b8c94fa535741c935a79a293d31d3da08d",
       resources: "resources",
     },
   },
@@ -455,6 +455,8 @@ async function main() {
         values["7zip"],
         [
           "x",
+          // 完整版 7-Zip 会先识别外层 PE；显式读取内嵌 7z，避免干净 runner 解不出组件。
+          ...(target === "win32-x64" ? ["-t7z"] : []),
           "-y",
           `-o${extracted}`,
           archive,

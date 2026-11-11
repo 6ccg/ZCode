@@ -80,6 +80,8 @@ pnpm exec tsx scripts/test/bundled-cua-windows-smoke.mts D:/private/release/win-
 
 发布时核对包内提交号、组件清单及附件 SHA-256；记录实际执行结果和未完成项到 Release。源码中只保留当前契约及本指南。私有资源不提交 Git；历史 Release 标签继续指向实际构建源码。后续 rebase 保留一个完整的 CUA 功能提交，升级修正合入该功能，按新版本重新构建应用。
 
+`.github/workflows/portable-release.yml` 在主线推送后自动构建 Windows x64 和 Mac arm64 的 ZIP，也支持手动触发。Actions 附件中的 `build-info-<target>.json` 来自最终包内的 build metadata，并记录官方组件输入和 ZIP 校验值。发布时等待两端成功，下载对应 run 的附件，核对提交与哈希后上传 Release；不要混用不同提交的产物。
+
 ## macOS 组件分析与适配差异
 
 Mac 的 SDK 位于归档的 `ZCode.app/Contents/Resources/glm/packages/node-repl-host/dist/mcp/server.js`。先比较它与已适配 SDK 的输入哈希，再检查导出及调用契约；不能仅因应用版本相同就假定字节或行为一致。
@@ -99,7 +101,7 @@ helper 位于 `ZCode.app/Contents/Resources/cua-helper/ZCode Computer Use.app`�
 在 macOS arm64 上生成及验收组件：
 
 ```sh
-node scripts/bundled-cua.mjs --target darwin-arm64 --archive /private/cua/ZCode-3.17.2-mac-arm64.zip --output /private/cua/bundle --sign-macos
+node scripts/bundled-cua.mjs --target darwin-arm64 --archive /private/cua/ZCode-3.18.0-mac-arm64.zip --output /private/cua/bundle --sign-macos
 node scripts/test/bundled-cua-macos-smoke.mjs /private/cua/bundle
 ZCODE_CUA_BUNDLE_DIR=/private/cua/bundle pnpm bundle:desktop -- --os mac --arch arm64
 ```

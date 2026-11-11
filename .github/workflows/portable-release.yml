@@ -1,0 +1,173 @@
+name: Portable desktop packages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portable-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # 原生 runtime host 使用 Visual Studio 2022；2025 镜像已切换到 VS 2026。
+          - runner: windows-2022
+            target: win32-x64
+            sevenzip: C:/Program Files/7-Zip/7z.exe
+          - runner: macos-26
+            target: darwin-arm64
+            sevenzip: 7z
+    defaults:
+      run:
+        shell: bash
+    env:
+      CUA_TARGET: ${{ matrix.target }}
+      SEVEN_ZIP: ${{ matrix.sevenzip }}
+      ZCODE_ENV: production
+      ZCODE_PREVIEW_IDENTITY: "0"
+      ZCODE_SKIP_REMOTE_ASSETS: "1"
+      ZCODE_ARMS_RUM_ENDPOINT: ""
+      ZCODE_TELEMETRY_REPORT_ENDPOINT: ""
+      ZCODE_AUTO_UPDATE: "0"
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+      - name: Verify Windows compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --version
+          $vs = & 'C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe' -products '*' -version '[17.0,18.0)' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual Studio 2022 C++ tools are required' }
+      - name: Prepare component tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/cua-tools" typescript@6.0.2 --no-audit --no-fund
+          node --input-type=module <<'NODE'
+          import { symlinkSync } from 'node:fs';
+          import { join } from 'node:path';
+          symlinkSync(join(process.env.RUNNER_TEMP, 'cua-tools/node_modules'), 'node_modules', process.platform === 'win32' ? 'junction' : 'dir');
+          NODE
+      - name: Resolve pinned component input
+        id: component
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { appendFileSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { CUA_RELEASE } from './scripts/bundled-cua.mjs';
+          assert.equal(`${process.platform}-${process.arch}`, process.env.CUA_TARGET);
+          const pin = CUA_RELEASE.targets[process.env.CUA_TARGET];
+          appendFileSync(process.env.GITHUB_OUTPUT, `archive=${join(process.env.RUNNER_TEMP, 'cua', pin.file)}\n`);
+          NODE
+      - name: Assemble and verify bundled components
+        env:
+          COMPONENT_ARCHIVE: ${{ steps.component.outputs.archive }}
+        run: |
+          args=()
+          if [ "$RUNNER_OS" = "macOS" ]; then args+=(--sign-macos); fi
+          node scripts/bundled-cua.mjs --target "$CUA_TARGET" --archive "$COMPONENT_ARCHIVE" --output "$RUNNER_TEMP/cua/bundle" --7zip "$SEVEN_ZIP" "${args[@]}"
+          node --test scripts/test/bundled-cua.test.mjs scripts/test/bundled-cua-macos.test.mjs
+      - name: Verify native Mac helper
+        if: runner.os == 'macOS'
+        run: node scripts/test/bundled-cua-macos-smoke.mjs "$RUNNER_TEMP/cua/bundle"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - name: Install application dependencies
+        run: |
+          node --input-type=module <<'NODE'
+          import { lstatSync, rmdirSync, unlinkSync } from 'node:fs';
+          if (!lstatSync('node_modules').isSymbolicLink()) throw new Error('Expected component bootstrap link');
+          if (process.platform === 'win32') rmdirSync('node_modules'); else unlinkSync('node_modules');
+          NODE
+          pnpm install --frozen-lockfile --ignore-scripts
+          pnpm rebuild --pending
+      - name: Build Windows application
+        if: runner.os == 'Windows'
+        # Windows 使用原生 tar，避免 Git Bash 的 GNU tar 把盘符当作远程主机。
+        shell: pwsh
+        env:
+          ZCODE_CUA_BUNDLE_DIR: ${{ runner.temp }}/cua/bundle
+        run: pnpm --filter @zcode/desktop build
+      - name: Build Mac application
+        if: runner.os == 'macOS'
+        env:
+          ZCODE_CUA_BUNDLE_DIR: ${{ runner.temp }}/cua/bundle
+        run: pnpm --filter @zcode/desktop build
+      - name: Package Windows directory
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: packages/desktop
+        env:
+          ZCODE_CUA_BUNDLE_DIR: ${{ runner.temp }}/cua/bundle
+        run: pnpm exec electron-builder --config electron-builder.config.js --win --x64 --dir --publish never
+      - name: Package Mac ZIP
+        if: runner.os == 'macOS'
+        working-directory: packages/desktop
+        env:
+          ZCODE_CUA_BUNDLE_DIR: ${{ runner.temp }}/cua/bundle
+        run: pnpm exec electron-builder --config electron-builder.config.js --mac zip --arm64 --publish never
+      - name: Verify packaged Windows native input and MCP
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: pnpm exec tsx scripts/test/bundled-cua-windows-smoke.mts packages/desktop/dist/win-unpacked/resources
+      - name: Verify packaged Mac SDK and authentication
+        if: runner.os == 'macOS'
+        run: ELECTRON_RUN_AS_NODE=1 packages/desktop/dist/mac-arm64/ZCode.app/Contents/MacOS/ZCode scripts/test/bundled-cua-macos-smoke.mjs packages/desktop/dist/mac-arm64/ZCode.app --packaged
+      - name: Verify archives and record packaged build identity
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          import { execFileSync } from 'node:child_process';
+          import { createReadStream, readFileSync, writeFileSync } from 'node:fs';
+          import { createRequire } from 'node:module';
+          import { join, resolve } from 'node:path';
+          const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          const dist = resolve('packages/desktop/dist');
+          const win = process.platform === 'win32';
+          const resources = win ? join(dist, 'win-unpacked/resources') : join(dist, 'mac-arm64/ZCode.app/Contents/Resources');
+          const asar = createRequire(resolve('packages/desktop/package.json'))('@electron/asar');
+          const metadata = JSON.parse(asar.extractFile(join(resources, 'app.asar'), join('out', 'metadata', 'build-meta.json')).toString('utf8'));
+          assert.equal(metadata.appVersion, version);
+          assert.ok(metadata.buildCommitId.length >= 7 && process.env.GITHUB_SHA.startsWith(metadata.buildCommitId), 'Packaged source commit mismatch');
+          const bundle = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, 'cua/bundle/bundle-manifest.json'), 'utf8'));
+          assert.equal(bundle.applicationVersion, version);
+          assert.equal(bundle.target, process.env.CUA_TARGET);
+          const name = `ZCode-${version}-${win ? 'win-x64-portable' : 'mac-arm64'}.zip`;
+          const archive = join(dist, name);
+          if (win) {
+            execFileSync(process.env.SEVEN_ZIP, ['a', '-tzip', archive, '*', '-mx=5', '-bso0', '-bsp0'], {cwd: join(dist, 'win-unpacked'), stdio: 'inherit'});
+            execFileSync(process.env.SEVEN_ZIP, ['t', archive, '-bso0', '-bsp0'], {stdio: 'inherit'});
+          } else {
+            execFileSync('/usr/bin/unzip', ['-tq', archive], {stdio: 'inherit'});
+          }
+          let bytes = 0;
+          const hash = createHash('sha256');
+          for await (const chunk of createReadStream(archive)) { bytes += chunk.length; hash.update(chunk); }
+          const info = {version, sourceCommit: process.env.GITHUB_SHA, target: process.env.CUA_TARGET, metadata, component: bundle, artifact: {name, bytes, sha256: hash.digest('hex')}, nativeAcceptance: win ? 'isolated-window-input-readback-and-packaged-mcp' : 'helper-authentication-packaged-sdk-pip-restart', macGrantedDesktopInputAcceptance: false};
+          writeFileSync(join(dist, `build-info-${process.env.CUA_TARGET}.json`), JSON.stringify(info, null, 2) + '\n');
+          console.log(JSON.stringify(info, null, 2));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zcode-${{ matrix.target }}-portable
+          path: |
+            packages/desktop/dist/*.zip
+            packages/desktop/dist/build-info-*.json
+          if-no-files-found: error
