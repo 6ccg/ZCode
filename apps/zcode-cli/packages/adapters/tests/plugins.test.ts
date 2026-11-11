@@ -313,7 +313,10 @@ describe("NodePluginAdapter", () => {
       vi.mocked(asyncFs.readFile).mockClear();
       for (let i = 0; i < 2; i += 1) {
         await expect(reader.json(path)).rejects.toMatchObject({ code: "ENOENT" });
-        await expect(reader.json(nested)).rejects.toMatchObject({ code: "ENOTDIR" });
+        // Windows 将文件下的路径报为 ENOENT，Unix 报 ENOTDIR；两者均不得触发正文读取。
+        await expect(reader.json(nested)).rejects.toMatchObject({
+          code: expect.stringMatching(/^(ENOENT|ENOTDIR)$/),
+        });
       }
       expect(
         vi.mocked(asyncFs.readFile).mock.calls.filter(([file]) => file === path || file === nested),
