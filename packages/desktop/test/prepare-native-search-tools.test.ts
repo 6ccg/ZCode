@@ -37,7 +37,11 @@ import {
   resolveNativeSearchPrebuiltPlan,
 } from "../../../scripts/native-search-tools-config.mjs";
 import { prepareNativeSearchTools } from "../../../scripts/prepare-native-search-tools.mjs";
-import { verifyPrebuiltArchiveSha256 } from "../../../scripts/prebuilt-binary-extract.mjs";
+import {
+  extractPrebuiltArchive,
+  findPrebuiltBinary,
+  verifyPrebuiltArchiveSha256,
+} from "../../../scripts/prebuilt-binary-extract.mjs";
 import {
   LEGACY_REMOTE_RIPGREP_ARCHIVE_SHA256_BY_TARGET,
   LEGACY_REMOTE_RIPGREP_VERSION,
@@ -83,6 +87,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -183,6 +188,46 @@ describe("native search 归档来源判定", () => {
 });
 
 describe("prepareNativeSearchTools", () => {
+  it.skipIf(process.platform !== "win32")(
+    "Windows ZIP 不加载继承路径中的压缩模块，损坏归档立即失败",
+    async () => {
+      const root = await createTemporaryDirectory();
+      const modules = join(root, "modules");
+      const archiveModule = join(modules, "Microsoft.PowerShell.Archive");
+      mkdirSync(archiveModule, { recursive: true });
+      writeFileSync(
+        join(archiveModule, "Microsoft.PowerShell.Archive.psm1"),
+        "function Expand-Archive { throw 'Incompatible compression module loaded' }; Export-ModuleMember -Function Expand-Archive",
+      );
+      vi.stubEnv("PSModulePath", `${modules};${process.env.PSModulePath ?? ""}`);
+      const plan = resolveNativeSearchPrebuiltPlan({
+        platform: "win32",
+        arch: "x64",
+        env: { NATIVE_SEARCH_TOOLS_ARTIFACT_SOURCE: "repository" },
+      }) as PrebuiltPlan;
+      const artifact = plan.artifacts.find(({ toolId }) => toolId === "ugrep")!;
+      const extractDir = join(root, "tool's folder");
+      extractPrebuiltArchive({
+        archivePath: artifact.archivePath,
+        archiveExt: "zip",
+        extractDir,
+        cwd: root,
+      });
+      expect(findPrebuiltBinary(extractDir, "ugrep.exe")).toBeDefined();
+
+      const invalidArchive = join(root, "invalid.zip");
+      writeFileSync(invalidArchive, "invalid zip");
+      expect(() =>
+        extractPrebuiltArchive({
+          archivePath: invalidArchive,
+          archiveExt: "zip",
+          extractDir: join(root, "invalid"),
+          cwd: root,
+        }),
+      ).toThrow();
+    },
+  );
+
   it("intranet 来源原样委托既有下载链路，并在工具目录写入 intranet-mirror 声明", async () => {
     const outputDir = join(await createTemporaryDirectory(), "tools");
     const env = { NATIVE_SEARCH_TOOLS_DOWNLOAD_BASE_URL: "https://deps.example.test/native" };

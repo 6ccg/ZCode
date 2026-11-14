@@ -168,6 +168,7 @@ producer 仍可作为显式人工流程使用：在对应平台的 producer runn
 - remote 资产使用 `resolveRemoteNativeSearchPrebuiltPlan`：Linux 与 desktop/SEA 同一 plan，macOS 保留 rg13；legacy rg13 的版本与摘要仍由 `native-search-tools-config.mjs` 唯一持有。
 - 两种来源在返回前都通过 `stageNativeSearchNotices` 在每个工具目录写入 `THIRD-PARTY-NOTICES.txt` 与 `SOURCES.json`（`binary.origin` 分别为 `intranet-mirror` / `repository-archive`），缓存命中也刷新；remote 组件在计算内容哈希前完成写入，因此组件归档自带材料。
 - 解包、定位与归档验真只有 `prebuilt-binary-extract.mjs` 一份实现，下载链路复用它；Windows 上 tar 参数统一使用正斜杠并优先相对 cwd 的归档路径，避免 GNU tar 把盘符当成远程主机。
+- Windows ZIP 在每次新建的临时目录中通过系统 .NET 解压，不依赖继承的 `PSModulePath` 或自动加载的压缩模块；解压失败须立即终止，不能继续查找或替换二进制。
 - producer 打包（`pack:native-search` / `ci:ensure-native-search-deps`）仍只打入二进制，保持与已固定 SHA-256 的归档逐字节可复现。
 
 ## 源码与依赖
