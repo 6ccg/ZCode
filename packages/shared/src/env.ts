@@ -49,7 +49,7 @@ export const ZCODE_BUILD_COMMIT_ID_ENV = "ZCODE_BUILD_COMMIT_ID" as const;
  */
 export const ZCODE_CLIENT_LANGUAGE_ENV = "ZCODE_CLIENT_LANGUAGE" as const;
 
-// 修改版没有对应的官方更新包；保留 production 身份也必须关闭更新，避免被官方包覆盖。
+// 官方安装包更新器保持关闭；绿色版使用用户配置来源的 portable-updates，不复用官方更新链路。
 export const ZCODE_APP_UPDATES_ENABLED: boolean = false;
 
 /** 修改版关闭营销投放、轮询与活动交互上报，不读取运行时开关。 */

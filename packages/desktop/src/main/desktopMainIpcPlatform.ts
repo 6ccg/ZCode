@@ -90,6 +90,9 @@ export function registerPlatformIpcHandlers(options: {
   syncActiveTaskSession: (windowId: number, sessionId: string | null) => void;
   syncTaskRealtimeWorkspaceKeys: (windowId: number, workspaceKeys: Iterable<string>) => void;
   getUpdateState: () => UpdateStatePayload;
+  managePortableUpdate: (
+    command: import("@zcode/shared").PortableUpdateCommand,
+  ) => Promise<import("@zcode/shared").PortableUpdateState>;
   openUpdateStatusWindow: () => void;
   syncWebRemoteControlWorkspaces: (
     windowId: number,
@@ -407,6 +410,11 @@ export function registerPlatformIpcHandlers(options: {
   );
 
   ipcMain.handle(PlatformChannels.GetUpdateState, () => options.getUpdateState());
+  ipcMain.handle(
+    PlatformChannels.PortableUpdate,
+    (_event, command: import("@zcode/shared").PortableUpdateCommand) =>
+      options.managePortableUpdate(command),
+  );
   ipcMain.handle(PlatformChannels.OpenUpdateStatusWindow, () => {
     options.openUpdateStatusWindow();
   });

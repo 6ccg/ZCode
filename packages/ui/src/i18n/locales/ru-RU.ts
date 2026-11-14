@@ -3628,6 +3628,31 @@ const ruRU: Record<string, string> = {
     "Отключите, если из-за некоторых GPU или драйверов окна пустые, приложение падает или есть проблемы с отрисовкой. Требуется перезапуск приложения.",
   "settings.desktopChromiumHardwareAccelerationSavedHint":
     "Настройка аппаратного ускорения Chrome сохранена. Перезапустите приложение, чтобы она вступила в силу.",
+  "settings.portableUpdate.availableNotice":
+    "Доступна версия {version}. Обновите приложение в настройках.",
+  "settings.portableUpdate.readyNotice":
+    "Версия {version} загружена. Сохраните работу перед перезапуском.",
+  "settings.portableUpdate.openSettings": "Открыть настройки обновлений",
+  "settings.portableUpdate.source": "Адрес обновлений",
+  "settings.portableUpdate.sourceHelp":
+    "URL GitHub Release или JSON-манифеста. Пустой адрес отключает запросы. Сохраните изменения.",
+  "settings.portableUpdate.automatic": "Проверять обновления автоматически",
+  "settings.portableUpdate.autoDownload": "Автоматически загружать новые версии",
+  "settings.portableUpdate.autoDownloadHelp":
+    "Для установки требуется ручной перезапуск. Выполняемые задачи не прерываются автоматически.",
+  "settings.portableUpdate.save": "Сохранить",
+  "settings.portableUpdate.check": "Проверить сейчас",
+  "settings.portableUpdate.download": "Загрузить обновление",
+  "settings.portableUpdate.cancel": "Отмена",
+  "settings.portableUpdate.install": "Перезапустить и установить",
+  "settings.portableUpdate.development": "Установка недоступна в режиме разработки",
+  "settings.portableUpdate.state.idle": "Нет ожидающих обновлений",
+  "settings.portableUpdate.state.checking": "Проверка обновлений",
+  "settings.portableUpdate.state.available": "Доступно обновление",
+  "settings.portableUpdate.state.downloading": "Загрузка",
+  "settings.portableUpdate.state.ready": "Готово к установке",
+  "settings.portableUpdate.state.installing": "Перезапуск для обновления",
+  "settings.portableUpdate.state.error": "Ошибка обновления. Можно повторить",
   "settings.receivePreviewUpdates": "Получать предварительные обновления",
   "settings.receivePreviewUpdatesDescription":
     "Если включено, вы первыми получаете новые функции и улучшения. Если выключено, обновления приходят по обычному графику релизов.",

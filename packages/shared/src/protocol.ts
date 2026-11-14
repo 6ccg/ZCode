@@ -426,6 +426,7 @@ export interface AppSettings {
   receivePreviewUpdates?: boolean;
   /** 设置页/更新弹窗“以后自动下载并安装更新”偏好；仅桌面端自动更新读取。 */
   autoDownloadAndInstallUpdates?: boolean;
+  portableUpdates?: import("./update.js").PortableUpdatePreferences;
   /** 用户跳过的 Electron 自动更新版本；按通道隔离，避免 stable / preview 互相遮挡。 */
   skippedElectronUpdateVersions?: Partial<Record<ElectronReleaseChannel, string>>;
   /** 首次启动设置同步提示是否已消费；只表示弹窗不再出现，不代表导入成功。 */

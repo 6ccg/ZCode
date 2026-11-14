@@ -802,11 +802,11 @@ export default {
           electronVersion: desktopElectronVersion,
         }),
       );
+    }
+    if (context.electronPlatformName === "win32") {
       await runTimedAsync("afterPack:writeWindowsInstallManifest", () =>
         writeWindowsInstallManifest(context),
       );
-    }
-    if (context.electronPlatformName === "win32") {
       // 普通打包没有 APP_DIR_* 宏；makensis 前落盘按架构的 helper define（见函数注释）。
       await writeInstallerProcessHelperDefine(
         context,
@@ -841,6 +841,7 @@ export default {
     }
   },
   extraResources: [
+    { from: "resources/portable-update", to: "portable-update" },
     ...(targetPlatform.os === "win32"
       ? [
           {

@@ -4007,6 +4007,31 @@ const enUS: Record<string, string> = {
     "Turn this off to work around blank windows, crashes, or rendering issues caused by some GPUs or drivers. Restart the app to take effect.",
   "settings.desktopChromiumHardwareAccelerationSavedHint":
     "Chrome hardware acceleration setting saved. Restart the app to take effect.",
+  "settings.portableUpdate.availableNotice":
+    "Version {version} is available. Open settings to update.",
+  "settings.portableUpdate.readyNotice":
+    "Version {version} is downloaded. Save your work before restarting.",
+  "settings.portableUpdate.openSettings": "Open update settings",
+  "settings.portableUpdate.source": "Update source",
+  "settings.portableUpdate.sourceHelp":
+    "Enter a GitHub Release or custom JSON manifest URL. An empty URL makes no requests. Save to apply.",
+  "settings.portableUpdate.automatic": "Check for updates automatically",
+  "settings.portableUpdate.autoDownload": "Download new versions automatically",
+  "settings.portableUpdate.autoDownloadHelp":
+    "Installation still requires Restart and install; running tasks are never interrupted automatically.",
+  "settings.portableUpdate.save": "Save",
+  "settings.portableUpdate.check": "Check now",
+  "settings.portableUpdate.download": "Download update",
+  "settings.portableUpdate.cancel": "Cancel",
+  "settings.portableUpdate.install": "Restart and install",
+  "settings.portableUpdate.development": "Installation is unavailable in development builds",
+  "settings.portableUpdate.state.idle": "No pending update",
+  "settings.portableUpdate.state.checking": "Checking for updates",
+  "settings.portableUpdate.state.available": "Update available",
+  "settings.portableUpdate.state.downloading": "Downloading",
+  "settings.portableUpdate.state.ready": "Ready to install",
+  "settings.portableUpdate.state.installing": "Restarting to update",
+  "settings.portableUpdate.state.error": "Update failed; retry is available",
   "settings.receivePreviewUpdates": "Receive preview updates early",
   "settings.receivePreviewUpdatesDescription":
     "When enabled, you will get the earliest access to new features and improvements. When disabled, you will receive update pushes according to the regular release schedule.",

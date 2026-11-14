@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { DesktopWindowChromeState, IPlatformService, UpdateStatePayload } from "@zcode/shared";
+import type {
+  DesktopWindowChromeState,
+  IPlatformService,
+  UpdateStatePayload,
+  PortableUpdateState,
+} from "@zcode/shared";
+import { useTabStore } from "@/store/TabStoreProvider.js";
+import { setPendingSettingsSectionIntent } from "@/lib/settingsNavigation.js";
 import { logger } from "@/logger.js";
 import { toast } from "@/components/ui/toast.js";
 import { useZCodeIntl } from "@/i18n/IntlProvider.js";
@@ -75,10 +82,70 @@ export function useAppChromeState({
   );
   const [updateReadyVersion, setUpdateReadyVersion] = useState<string | null>(null);
   const [updateState, setUpdateState] = useState<UpdateStatePayload | null>(null);
+  const { intl } = useZCodeIntl();
+  const openSettingsTab = useTabStore((state) => state.openSettingsTab);
+  const shownPortableUpdates = useRef(new Set<string>());
+  const managePortableUpdate = platform.managePortableUpdate;
+  const subscribePortableUpdate = platform.onPortableUpdateStateChanged;
+  useEffect(() => {
+    if (
+      !isDesktop ||
+      (!isMacDesktop && !isWindowsDesktop) ||
+      !managePortableUpdate ||
+      !subscribePortableUpdate
+    )
+      return;
+    let active = true;
+    let revision = -1;
+    const receive = (state: PortableUpdateState) => {
+      if (!active || state.revision < revision) return;
+      revision = state.revision;
+      if (!state.version || (state.phase !== "available" && state.phase !== "ready")) return;
+      const key = `${state.version}:${state.phase}`;
+      if (shownPortableUpdates.current.has(key)) return;
+      shownPortableUpdates.current.add(key);
+      toast(
+        intl.formatMessage(
+          {
+            id:
+              state.phase === "ready"
+                ? "settings.portableUpdate.readyNotice"
+                : "settings.portableUpdate.availableNotice",
+          },
+          { version: state.version },
+        ),
+        {
+          durationMs: 10_000,
+          variant: "update",
+          dedupeKey: "portable-update",
+          actionLabel: intl.formatMessage({ id: "settings.portableUpdate.openSettings" }),
+          onAction: () => {
+            setPendingSettingsSectionIntent("general");
+            openSettingsTab();
+          },
+        },
+      );
+    };
+    const stop = subscribePortableUpdate(receive);
+    void managePortableUpdate({ action: "status" })
+      .then(receive)
+      .catch((error) => logger.warn("[portable-update] snapshot unavailable", error));
+    return () => {
+      active = false;
+      stop();
+    };
+  }, [
+    isDesktop,
+    isMacDesktop,
+    isWindowsDesktop,
+    managePortableUpdate,
+    subscribePortableUpdate,
+    intl,
+    openSettingsTab,
+  ]);
   const sidebarContainerRef = useRef<HTMLElement | null>(null);
   const hasShownUpdateToastRef = useRef(false);
   const updateStateEventRevisionRef = useRef(0);
-  const { intl } = useZCodeIntl();
 
   useEffect(() => {
     if (!isDesktop || !isMacDesktop) {

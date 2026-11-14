@@ -3004,6 +3004,29 @@ async function waitForProcessesExit(pids: number[], timeoutMs: number) {
 }
 
 async function runE2ERendererBridgePreflight(specs: string[] = []) {
+  if (
+    E2E_PACKAGED_APP_BINARY_PATH &&
+    specs.length > 0 &&
+    specs.every((spec) => /[/\\]portable-update-settings\.test\.ts$/.test(spec))
+  ) {
+    // 正式绿色包没有开发专用 session store；更新用例只使用公开 preload API，
+    // 不能为了通过通用 store preflight 把可变测试桥编译进发布包。
+    await browser.waitUntil(
+      () =>
+        browser.execute(() => {
+          const bridge = (window as unknown as { zcode?: { managePortableUpdate?: unknown } })
+            .zcode;
+          return (
+            document.readyState !== "loading" && typeof bridge?.managePortableUpdate === "function"
+          );
+        }),
+      {
+        timeout: E2E_RENDERER_BRIDGE_PREFLIGHT_TIMEOUT_MS,
+        timeoutMsg: "Packaged updater preload is unavailable",
+      },
+    );
+    return;
+  }
   const attempt = await waitForE2ERendererBridgePreflight();
   if (!attempt.error) {
     return;

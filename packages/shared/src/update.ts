@@ -1,5 +1,26 @@
 import type { ElectronReleaseChannel, Locale } from "./protocol.js";
 
+export interface PortableUpdatePreferences {
+  source: string;
+  automatic: boolean;
+  autoDownload: boolean;
+}
+
+export interface PortableUpdateState {
+  revision: number;
+  supported: boolean;
+  preferences: PortableUpdatePreferences;
+  phase: "idle" | "checking" | "available" | "downloading" | "ready" | "installing" | "error";
+  currentVersion: string;
+  version?: string;
+  progress?: number;
+  error?: string;
+}
+
+export type PortableUpdateCommand =
+  | { action: "status" | "check" | "download" | "cancel" | "install" }
+  | { action: "configure"; preferences: PortableUpdatePreferences };
+
 export interface PostUpdateReleaseNotesPayload {
   version: string;
   title: string;

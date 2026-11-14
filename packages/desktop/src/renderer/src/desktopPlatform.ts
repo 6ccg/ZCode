@@ -197,6 +197,13 @@ export function createDesktopPlatform(options: {
     onUpdateStateChanged: (callback) => window.zcode.onUpdateStateChanged?.(callback) ?? (() => {}),
     getUpdateState: () =>
       window.zcode.getUpdateState?.() ?? Promise.resolve({ kind: "idle", enabled: true }),
+    managePortableUpdate: (command) => {
+      if (!window.zcode.managePortableUpdate)
+        return Promise.reject(new Error("绿色版更新接口不可用"));
+      return window.zcode.managePortableUpdate(command);
+    },
+    onPortableUpdateStateChanged: (callback) =>
+      window.zcode.onPortableUpdateStateChanged?.(callback) ?? (() => {}),
     downloadUpdate: () => window.zcode.downloadUpdate?.() ?? Promise.resolve(),
     cancelUpdateDownload: () => window.zcode.cancelUpdateDownload?.() ?? Promise.resolve(),
     openUpdateStatusWindow: () => window.zcode.openUpdateStatusWindow?.() ?? Promise.resolve(),

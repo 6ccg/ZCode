@@ -511,6 +511,8 @@ export const PlatformChannels = {
   UpdateStateChanged: "zcode:update-state-changed",
   /** Renderer → Main：主动获取当前自动更新状态（菜单打开时补偿事件丢失） */
   GetUpdateState: "zcode:get-update-state",
+  PortableUpdate: "zcode:portable-update",
+  PortableUpdateStateChanged: "zcode:portable-update-state-changed",
   /** Renderer → Main：开始下载当前已发现的自动更新 */
   DownloadUpdate: "zcode:download-update",
   /** Renderer → Main：取消当前正在下载的自动更新 */
@@ -1383,6 +1385,14 @@ export interface PlatformChannelMap {
   };
   [PlatformChannels.OpenUpdateStatusWindow]: {
     request: void;
+    response: void;
+  };
+  [PlatformChannels.PortableUpdate]: {
+    request: import("./update.js").PortableUpdateCommand;
+    response: import("./update.js").PortableUpdateState;
+  };
+  [PlatformChannels.PortableUpdateStateChanged]: {
+    request: import("./update.js").PortableUpdateState;
     response: void;
   };
   [PlatformChannels.GetAutoUpdatePreferences]: {

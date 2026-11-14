@@ -3655,6 +3655,31 @@ const jaJP: Record<string, string> = {
     "一部の GPU やドライバーが原因の白い画面、クラッシュ、描画の問題を回避するにはオフにしてください。反映にはアプリの再起動が必要です。",
   "settings.desktopChromiumHardwareAccelerationSavedHint":
     "Chrome のハードウェアアクセラレーション設定を保存しました。反映にはアプリの再起動が必要です。",
+  "settings.portableUpdate.availableNotice":
+    "新しいバージョン {version} を利用できます。設定から更新できます。",
+  "settings.portableUpdate.readyNotice":
+    "{version} のダウンロードが完了しました。作業を保存してから再起動してください。",
+  "settings.portableUpdate.openSettings": "更新設定を開く",
+  "settings.portableUpdate.source": "更新元 URL",
+  "settings.portableUpdate.sourceHelp":
+    "GitHub Release または JSON マニフェストの URL。空欄では通信しません。変更後に保存してください。",
+  "settings.portableUpdate.automatic": "更新を自動確認",
+  "settings.portableUpdate.autoDownload": "新バージョンを自動ダウンロード",
+  "settings.portableUpdate.autoDownloadHelp":
+    "インストールには手動の再起動が必要です。実行中のタスクを自動で中断しません。",
+  "settings.portableUpdate.save": "保存",
+  "settings.portableUpdate.check": "今すぐ確認",
+  "settings.portableUpdate.download": "更新をダウンロード",
+  "settings.portableUpdate.cancel": "キャンセル",
+  "settings.portableUpdate.install": "再起動して更新",
+  "settings.portableUpdate.development": "開発環境ではインストールできません",
+  "settings.portableUpdate.state.idle": "待機中の更新はありません",
+  "settings.portableUpdate.state.checking": "更新を確認中",
+  "settings.portableUpdate.state.available": "更新があります",
+  "settings.portableUpdate.state.downloading": "ダウンロード中",
+  "settings.portableUpdate.state.ready": "更新の準備完了",
+  "settings.portableUpdate.state.installing": "更新のため再起動中",
+  "settings.portableUpdate.state.error": "更新に失敗しました。再試行できます",
   "settings.receivePreviewUpdates": "プレビュー版の更新を早めに受け取る",
   "settings.receivePreviewUpdatesDescription":
     "有効にすると、新機能や改善をいち早く利用できます。無効にすると、通常のリリーススケジュールに従って更新が配信されます。",

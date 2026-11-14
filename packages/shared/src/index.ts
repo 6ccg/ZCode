@@ -108,6 +108,11 @@ export {
 export * from "./prompt-enhancement.js";
 export * from "./rendererActionTrace.js";
 export * from "./validation.js";
+export type {
+  PortableUpdateCommand,
+  PortableUpdateState,
+  PortableUpdatePreferences,
+} from "./update.js";
 export * from "./api.js";
 export * from "./zcode-protocol/index.js";
 export * from "./account-provider-state.js";

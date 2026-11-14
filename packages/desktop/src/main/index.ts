@@ -52,9 +52,18 @@ import {
   webContents,
 } from "electron";
 import { randomUUID } from "node:crypto";
+import {
+  createPortableUpdater,
+  createPortableInstaller,
+  type DesktopPortableUpdatesContract,
+} from "./portable-updates/index.js";
+import { readBuildMetadata } from "./about.js";
+import { applyDesktopSessionNetworkPolicy } from "./desktopNetworkPolicy.js";
+import { ZCODE_COMMIT, ZCODE_BUILD_TIME } from "@zcode/shared";
+import { writeFile as writePortableUpdateResult } from "node:fs/promises";
 import type { UtilityProcess as ElectronUtilityProcess } from "electron";
 import { spawn } from "node:child_process";
-import { join, resolve } from "node:path";
+import { join, resolve, dirname } from "node:path";
 import { homedir, hostname } from "node:os";
 import {
   createCredentialService,
@@ -777,6 +786,7 @@ const UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT = 224;
 const UPDATE_STATUS_WINDOW_READY_HEIGHT = UPDATE_STATUS_WINDOW_PROGRESS_HEIGHT - 54;
 const UPDATE_STATUS_WINDOW_TRAFFIC_LIGHT_POSITION = { x: 10, y: 10 } as const;
 const mainSettingService = createSettingService();
+let portableUpdater: DesktopPortableUpdatesContract | undefined;
 const webRemoteControlCredentialService = createCredentialService();
 const appLaunchGate = createAppLaunchGate();
 const appLaunchCoordinator = createAppLaunchCoordinator(appLaunchGate);
@@ -1237,6 +1247,10 @@ function syncCloseToTrayOnWindows(value: unknown) {
 }
 
 function syncImmediateAppSettings(patch: ReturnType<typeof appSettingsPatchSchema.parse>) {
+  if (patch.portableUpdates)
+    void portableUpdater
+      ?.reloadPreferences()
+      .catch((error) => logger.warn("[portable-update] settings refresh failed", error));
   syncCloseToTrayOnWindows(patch.closeToTrayOnWindows);
 
   if (typeof patch.keepAwakeWhileRunning === "boolean") {
@@ -1337,6 +1351,9 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
   );
 
   appQuitPreparationInFlight = Promise.all([
+    portableUpdater
+      ?.dispose()
+      .catch((error) => logger.warn("[portable-update] cleanup failed", error)),
     // 退出屏障结束后再启动窗口尺寸写入，可能在 app.exit 前留下 setting.json.lock。
     // 尺寸已在 resize 防抖或最大化状态变化时保存，退出屏障不再创建新的尺寸写入。
     // 修复原因：Main 过去不会等待仍在发送的 /event/report，正常退出也会直接丢事件。
@@ -2394,6 +2411,84 @@ app.whenReady().then(async () => {
   await hydratePendingPostUpdateReleaseNotes(mainSettingService);
   logWindowsBundledRuntimeIntegrityDiagnostic();
 
+  if (process.platform === "win32" || process.platform === "darwin") {
+    const metadata = readBuildMetadata();
+    const cacheDir = join(app.getPath("userData"), "portable-updates");
+    const updateSession = session.fromPartition("zcode-portable-updates", { cache: false });
+    const executable = app.getPath("exe");
+    const installer = createPortableInstaller({
+      platform: process.platform,
+      appRoot:
+        process.platform === "win32" ? dirname(executable) : resolve(dirname(executable), "../.."),
+      executable,
+      cacheDir,
+      helpersDir: app.isPackaged
+        ? join(process.resourcesPath, "portable-update")
+        : join(app.getAppPath(), "resources/portable-update"),
+      protectedPaths: async () => [
+        app.getPath("userData"),
+        app.getPath("sessionData"),
+        getZCodeDataRootDir(),
+      ],
+      onStage: (stage) => logger.info(`[portable-update] ${stage}`),
+    });
+    portableUpdater = createPortableUpdater({
+      settings: mainSettingService,
+      current: {
+        version: app.getVersion(),
+        commit: metadata?.buildCommitId ?? ZCODE_COMMIT,
+        buildTime: metadata?.buildTime ?? ZCODE_BUILD_TIME,
+      },
+      target: `${process.platform}-${process.arch}`,
+      supported: app.isPackaged && ZCODE_PRODUCT_FLAVOR === "production",
+      cacheDir,
+      async fetch(url, init) {
+        await applyDesktopSessionNetworkPolicy(
+          updateSession,
+          await mainSettingService.get(),
+          logger,
+          { name: "portable-updates" },
+        );
+        return updateSession.fetch(url, { ...init, credentials: "omit" });
+      },
+      prepare: installer.prepare,
+      canInstall: () => getRunningAgentSessionCount() === 0,
+      async install(plan) {
+        await installer.validate(plan);
+        if (getRunningAgentSessionCount() > 0) throw new Error("请先结束正在运行的 Agent 任务");
+        // 先复用 Host/CLI/CUA 退出屏障，避免后续 Windows 子进程扫描误杀新启动的替换 helper。
+        notifyStabilityLifecycle("update_install");
+        try {
+          await prepareAppQuit("portable-update", "update-install");
+          if (process.platform === "win32") await prepareWindowsProcessesForUpdateInstall();
+          await installer.launch(plan);
+          app.quit();
+        } catch (error) {
+          // 运行时已收尾，helper 未接管时重新启动旧程序，不能留下看似可用但 Host 已关闭的窗口。
+          logger.error("[portable-update] helper launch failed", error);
+          await writePortableUpdateResult(
+            join(cacheDir, "result.json"),
+            JSON.stringify({ error: "更新未完成，已重新启动旧版本，请重新检查更新" }),
+            "utf8",
+          ).catch(() => {});
+          app.relaunch();
+          app.exit(0);
+          throw error;
+        }
+      },
+      broadcast(state) {
+        for (const win of getApplicationWindowsExcludingCuaIndicator())
+          if (!win.isDestroyed())
+            win.webContents.send(PlatformChannels.PortableUpdateStateChanged, state);
+      },
+      onPreferencesChanged() {
+        for (const win of getApplicationWindowsExcludingCuaIndicator())
+          if (!win.isDestroyed()) win.webContents.send(PlatformChannels.SettingsChanged);
+      },
+    });
+    await portableUpdater.initialize();
+  }
+
   // 修改版不使用官方更新源；产品策略同时约束后台检查和远端强制升级。
   void initAutoUpdater({
     enabled:
@@ -2559,6 +2654,10 @@ app.whenReady().then(async () => {
       }
     },
     getUpdateState: getAutoUpdaterState,
+    managePortableUpdate: (command) => {
+      if (!portableUpdater) throw new Error("当前平台不支持绿色版更新");
+      return portableUpdater.execute(command);
+    },
     openUpdateStatusWindow,
     getAutoUpdatePreferences,
     setAutoDownloadAndInstallUpdates,

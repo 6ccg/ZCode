@@ -130,6 +130,8 @@ jobs:
           NODE
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm rebuild --pending
+      - name: Verify portable update installer helper
+        run: node node_modules/vitest/vitest.mjs run --project engineering packages/desktop/test/portable-updates.test.ts
       - name: Build Windows application
         if: runner.os == 'Windows'
         # Windows 使用原生 tar，避免 Git Bash 的 GNU tar 把盘符当作远程主机。
@@ -201,6 +203,8 @@ jobs:
           writeFileSync(join(dist, `build-info-${process.env.CUA_TARGET}.json`), JSON.stringify(info, null, 2) + '\n');
           console.log(JSON.stringify(info, null, 2));
           NODE
+      - name: Verify portable update archive
+        run: node packages/desktop/scripts/portable-update-package-smoke.mjs --packaged
       - uses: actions/upload-artifact@v4
         with:
           name: zcode-${{ matrix.target }}-portable

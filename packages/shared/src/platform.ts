@@ -1324,6 +1324,13 @@ export interface IPlatformService {
   /** 主动读取当前自动更新状态，用于菜单打开时补偿异步事件丢失 */
   getUpdateState?(): Promise<UpdateStatePayload>;
 
+  managePortableUpdate?(
+    command: import("./update.js").PortableUpdateCommand,
+  ): Promise<import("./update.js").PortableUpdateState>;
+  onPortableUpdateStateChanged?(
+    callback: (state: import("./update.js").PortableUpdateState) => void,
+  ): () => void;
+
   /** 用户在更新弹窗中确认开始下载当前已发现版本 */
   downloadUpdate(): Promise<void>;
 
