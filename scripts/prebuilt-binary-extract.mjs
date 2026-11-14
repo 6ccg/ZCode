@@ -39,13 +39,16 @@ export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cw
   mkdirSync(extractDir, { recursive: true });
   if (archiveExt === "zip") {
     if (process.platform === "win32") {
+      // CI 从 pwsh 继承的 PSModulePath 会让 Windows PowerShell 加载不兼容的
+      // PowerShell 7 Archive 模块；直接用系统 .NET 解压到调用方的新临时目录，
+      // 并将解压异常作为失败退出，避免误报为找不到归档内的二进制。
       runCommand("powershell.exe", [
         "-NoProfile",
         "-NonInteractive",
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        `Expand-Archive -LiteralPath '${archivePath.replaceAll("'", "''")}' -DestinationPath '${extractDir.replaceAll("'", "''")}' -Force`,
+        `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('${archivePath.replaceAll("'", "''")}', '${extractDir.replaceAll("'", "''")}')`,
       ]);
       return;
     }

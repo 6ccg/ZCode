@@ -29,10 +29,13 @@ if (process.platform !== "win32") {
   const tempRoot = mkdtempSync(join(tmpdir(), "zcode-preserve-files-"));
   try {
     const makensisPath = resolve(nsisDir, "makensis.exe");
+    // 夹具和 include 均为 UTF-8；依赖系统 ACP 会在繁体中文 Windows 上误报 Bad text encoding。
+    const inputCharsetArgs = ["/INPUTCHARSET", "UTF8"];
     const uninstallerOutput = join(tempRoot, "uninstaller.exe");
     execFileSync(
       makensisPath,
       [
+        ...inputCharsetArgs,
         "/V2",
         "/INPUTCHARSET",
         "UTF8",
@@ -54,6 +57,7 @@ if (process.platform !== "win32") {
     execFileSync(
       makensisPath,
       [
+        ...inputCharsetArgs,
         "/V2",
         "/INPUTCHARSET",
         "UTF8",
@@ -85,7 +89,7 @@ if (process.platform !== "win32") {
       ];
       if (omitManifest) compileArgs.splice(-1, 0, "/DOMIT_MANIFEST");
       if (scenario === "self-manifest") compileArgs.splice(-1, 0, "/DSELF_MANIFEST");
-      execFileSync(makensisPath, compileArgs, {
+      execFileSync(makensisPath, [...inputCharsetArgs, ...compileArgs], {
         cwd: workspaceDir,
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "pipe"],
@@ -122,7 +126,7 @@ if (process.platform !== "win32") {
       "/DFAIL_DELETE",
       fixturePath,
     ];
-    execFileSync(makensisPath, failureCompileArgs, {
+    execFileSync(makensisPath, [...inputCharsetArgs, ...failureCompileArgs], {
       cwd: workspaceDir,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -196,7 +200,10 @@ if (process.platform !== "win32") {
       if (scenario === "restore-failure") recoveryArgs.push("/DRESTORE_FAILURE");
       if (deleteFails) recoveryArgs.push("/DBACKUP_DELETE_FAILURE");
       recoveryArgs.push(fixturePath);
-      execFileSync(makensisPath, recoveryArgs, { cwd: workspaceDir, encoding: "utf8" });
+      execFileSync(makensisPath, [...inputCharsetArgs, ...recoveryArgs], {
+        cwd: workspaceDir,
+        encoding: "utf8",
+      });
       let recoveryExitCode = 0;
       try {
         execFileSync(recoveryOutputPath, ["/S", `/D=${recoveryInstallDir}`], { encoding: "utf8" });

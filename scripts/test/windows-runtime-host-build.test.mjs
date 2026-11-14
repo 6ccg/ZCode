@@ -27,6 +27,12 @@ test("cross builds explicitly select a Windows compiler", () => {
     ),
   );
 });
+test("Windows builds honor the selected Visual Studio generator", () => {
+  assert.deepEqual(
+    resolveRuntimeHostBuild("x64", "win32", undefined, "Visual Studio 18 2026").configureArgs,
+    ["-G", "Visual Studio 18 2026", "-A", "x64"],
+  );
+});
 test("packaging rejects wrong-architecture and corrupt PE binaries", () => {
   const bytes = Buffer.alloc(128);
   bytes.write("MZ");

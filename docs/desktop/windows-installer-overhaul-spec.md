@@ -20,6 +20,10 @@
 - 打包态主进程 AUMID 必须等于 electron-builder `appId`；开发态保留独立 AUMID。
 - macOS/Linux 不进入 Windows 安装交接分支；桌面 continuous 与手机 web-remote replayable 状态链路不互相扩散。
 
+原生 runtime host 与安装进程 helper 共用 CMake 构建。默认使用 Visual Studio 2022；构建机可通过标准 `CMAKE`、`CMAKE_GENERATOR` 选择已安装的 CMake 和 Visual Studio 版本，目标架构仍显式指定为 x64 或 ARM64。构建选项不进入应用运行设置。
+
+原生权限拒绝回归使用未启用 `SeDebugPrivilege` 的测试令牌；管理员调试特权会绕过进程 DACL，不能用于证明拒绝访问场景。
+
 ## 版本边界与前向收敛
 
 - `.zcode-install-manifest` 是新旧卸载器之间的能力标记，不要求比较数字版本。更新调用旧卸载器前，安装器先检查旧安装目录是否存在该文件：存在即按 manifest cleanup，不触发 `.zcode` 保护扫描；缺失即按 legacy full-cleanup 风险处理，先执行 `.zcode` 保护扫描。

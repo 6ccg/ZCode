@@ -108,7 +108,8 @@ describe("plugin lifecycle E2E admission scripts", () => {
     const dryRun = runScript("promote-plugin-e2e.mjs", ["--spec", pendingSpec]);
     expect(dryRun.status).toBe(0);
     expect(dryRun.stdout).toContain("Dry run plugin E2E promotion");
-    expect(dryRun.stdout).toContain(
+    // CLI 输出使用平台路径分隔符，验收目录关系时统一为仓库内的斜杠形式。
+    expect(dryRun.stdout.replaceAll("\\", "/")).toContain(
       " -> packages/desktop/test/e2e/plugins/installation/plugin-promotion-check-probe.test.ts",
     );
     expect(dryRun.stdout).toContain(

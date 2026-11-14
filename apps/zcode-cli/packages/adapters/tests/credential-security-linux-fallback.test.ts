@@ -82,7 +82,10 @@ describe("Linux Desktop private file key fallback", () => {
     await store.save("zcodejwttoken", "linux-login-token");
     expect(fallbacks).toBe(before + 1);
     expect(JSON.parse(await readFile(fixture.file, "utf8")).zcodejwttoken).toMatch(/^enc:v2:env:/);
-    expect((await stat(fixture.secretFile)).mode & 0o777).toBe(0o600);
+    // Windows 的 mode 不表示 POSIX 访问权限；密文与复用仍验证，权限位由 POSIX runner 验收。
+    if (process.platform !== "win32") {
+      expect((await stat(fixture.secretFile)).mode & 0o777).toBe(0o600);
+    }
     expect((await readdir(fixture.dir)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
     await expect(readFile(fixture.sourceFile, "utf8")).rejects.toHaveProperty("code", "ENOENT");
 
@@ -192,7 +195,9 @@ describe("Linux Desktop private file key fallback", () => {
     const prepared = await readFile(fixture.secretFile, "utf8");
     await prepareServerCredentialStorage({ filePath: fixture.file, env: {} });
     expect(await readFile(fixture.secretFile, "utf8")).toBe(prepared);
-    expect((await stat(fixture.secretFile)).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") {
+      expect((await stat(fixture.secretFile)).mode & 0o777).toBe(0o600);
+    }
   });
 
   it("does not reconfigure after the process already loaded a default key", async () => {

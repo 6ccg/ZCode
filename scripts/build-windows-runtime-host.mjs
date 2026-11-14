@@ -12,13 +12,15 @@ export function resolveRuntimeHostBuild(
   arch,
   hostPlatform = process.platform,
   compiler = process.env.ZCODE_WINDOWS_CXX,
+  generator = process.env.CMAKE_GENERATOR || "Visual Studio 17 2022",
 ) {
   if (arch !== "x64" && arch !== "arm64")
     throw new Error(`Unsupported runtime host architecture: ${arch}`);
   return {
     configureArgs:
       hostPlatform === "win32"
-        ? ["-G", "Visual Studio 17 2022", "-A", arch === "arm64" ? "ARM64" : "x64"]
+        ? // 本机与 CI 的 VS 版本可能不同；尊重 CMake 的标准生成器配置，避免固定寻找未安装的版本。
+          ["-G", generator, "-A", arch === "arm64" ? "ARM64" : "x64"]
         : [
             "-DCMAKE_SYSTEM_NAME=Windows",
             `-DCMAKE_CXX_COMPILER=${compiler || (arch === "arm64" ? "aarch64-w64-mingw32-clang++" : "x86_64-w64-mingw32-g++")}`,
