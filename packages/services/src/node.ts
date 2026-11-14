@@ -642,6 +642,8 @@ import {
   isScreenCaptureProbeSuccess,
   reapOrphanedHelpers,
   resolveStandaloneStatusLaunchAppPath,
+  resolveWindowsCuaRuntimeEnvironment,
+  cuaBrokerRefreshMarkerPath,
   shouldRunCuaScreenCaptureProbe,
   type CuaHelperHost,
   type CuaHelperTransportRestartOptions,
@@ -662,12 +664,14 @@ import {
 } from "#src/cua-permission-broker/windowsCuaDevRuntime.js";
 import { createCanonicalCuaHelperInstaller } from "./cua-permission-broker/cuaHelperInstaller.js";
 import { WindowsCuaHelperHost } from "#src/cua-permission-broker/windowsCuaDevHelperHost.js";
+import { selectWindowsCuaHelperResolver } from "#src/cua-permission-broker/windowsCuaHelperHostSupport.js";
 import {
   getStableCuaPipeName,
   resolveStableCuaWinRecipe,
 } from "#src/cua-permission-broker/stableCuaTransport.js";
 import { HELPER_APP_NAME } from "@zcode/zcode-cua/broker/helperConstants";
 import { resolveBrokerSocketPath } from "@zcode/zcode-cua/broker/socketPath";
+import { mintBrokerSocketPath } from "@zcode/zcode-cua/broker";
 import {
   DEFAULT_ZCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
   ZCODE_JWT_INVALID_BROADCAST_CHANNEL,
@@ -724,6 +728,7 @@ interface ServiceWithDisposeAllAndWait {
 const CUA_HELPER_HEALTH_TIMEOUT_MS = 30_000;
 
 type DefaultCuaProductHelper = {
+  admissionTransport?: { socketPath: string; pluginAuthority: string };
   host: ManagedCuaProductHelperHost;
   macPermissionHost?: CuaHelperHost;
   resolver: CuaProductMcpServerResolver;
@@ -935,18 +940,26 @@ export function createDynamicCuaProductMcpServerResolver(options: {
     resolver: CuaProductMcpServerResolver,
     context?: CuaProductMcpServerResolverContext,
   ) => boolean;
+  onPreparationError?: (error: unknown) => void;
 }): CuaProductMcpServerResolver {
   return {
     async resolveMcpServers(servers, context) {
       if (!options.isPluginEnabled(context)) return servers;
-      const resolver = await options.getResolver(context);
-      if (!resolver) return servers;
-      const resolved = await resolver.resolveMcpServers(servers, context);
-      // delegate 可能跨过 Helper start/health await；dispose 在等待中置 terminal 时，不能把旧代际
-      // 刚注入的 socket/token 交给晚到 Agent。移除 CUA candidate，保持其它 MCP 原样。
-      return options.isResolverCurrent?.(resolver, context) === false
-        ? servers?.filter((server) => !isPotentialZCodeCuaAgentMcpServer(server))
-        : resolved;
+      try {
+        const resolver = await options.getResolver(context);
+        if (!resolver) return servers;
+        const resolved = await resolver.resolveMcpServers(servers, context);
+        // delegate 可能跨过 Helper start/health await；dispose 在等待中置 terminal 时，不能把旧代际
+        // 刚注入的 socket/token 交给晚到 Agent。移除 CUA candidate，保持其它 MCP 原样。
+        return options.isResolverCurrent?.(resolver, context) === false
+          ? servers?.filter((server) => !isPotentialZCodeCuaAgentMcpServer(server))
+          : resolved;
+      } catch (error) {
+        // 外部 bridge 的兼容冷启动也属于可选 CUA 准备。失败不应阻止普通 Agent 会话；
+        // 显式 restart 保留下面原有的异常路径，以便设置页展示具体失败。
+        options.onPreparationError?.(error);
+        return servers?.filter((server) => !isPotentialZCodeCuaAgentMcpServer(server));
+      }
     },
     async restart() {
       // 委托到底层真实 resolver（由 ICuaPermissionService.restartHelper 经此调用）。
@@ -1122,6 +1135,13 @@ export function createDefaultCuaProductHelper(
     return undefined;
   }
   const logger = createServiceLogger("cua-product-helper");
+  // 随包后端的 spawn、health 和 helper 必须共享同一份凭据；每个 Agent 另铸随机值会认证失败。
+  const admissionTransport = resolveWindowsCuaRuntimeEnvironment().ZCODE_CUA_RUNTIME_PACKAGE_DIR
+    ? {
+        socketPath: platform === "win32" ? getStableCuaPipeName() : mintBrokerSocketPath({ env }),
+        pluginAuthority: randomBytes(16).toString("hex"),
+      }
+    : undefined;
   // Best-effort, once per process: reap Helpers orphaned by prior sessions before minting a
   // fresh one. Complements the per-Helper launcher-pid watchdog (helperMain); the reaper never
   // throws, so it cannot block startup.
@@ -1143,6 +1163,7 @@ export function createDefaultCuaProductHelper(
     macPermissionHost =
       options.createMacHost?.() ??
       createProductCuaHelperHost({
+        ...(admissionTransport ?? {}),
         logger,
         env: process.env,
         helperInstaller: createCanonicalCuaHelperInstaller({
@@ -1175,6 +1196,9 @@ export function createDefaultCuaProductHelper(
         options.createWindowsHost ??
         ((runtime) =>
           new WindowsCuaHelperHost({
+            ...(admissionTransport
+              ? { mintPluginAuthority: () => admissionTransport.pluginAuthority }
+              : {}),
             runtime,
             logger,
             mintSocketPath: () => getStableCuaPipeName(),
@@ -1187,6 +1211,7 @@ export function createDefaultCuaProductHelper(
   });
   return {
     host,
+    ...(admissionTransport ? { admissionTransport } : {}),
     ...(macPermissionHost ? { macPermissionHost } : {}),
     resolver,
   };
@@ -2062,6 +2087,7 @@ export function createLocalServices(options: {
       if (host?.running && host.socketPath) {
         return {
           socketPath: host.socketPath,
+          pluginAuthority: host.pluginAuthority ?? undefined,
         };
       }
       // 懒启动：无托管 host 时探测稳定 socket 上自启动的 Helper（probe-only，不拉起）。
@@ -2142,6 +2168,8 @@ export function createLocalServices(options: {
           }>({
             socketPath: stable,
             method: "permission_status",
+            pluginAuthority:
+              defaultCuaProductHelperLifecycle.peek()?.helper.admissionTransport?.pluginAuthority,
             timeoutMs: 3000,
           });
           return {
@@ -2571,7 +2599,25 @@ export function createLocalServices(options: {
           [BROKER_SOCKET_ENV]: brokerSocket,
           [ZCODE_CUA_PLUGIN_AUTHORITY_ENV_KEY]: randomBytes(16).toString("hex"),
         };
-        if (process.platform === "win32") {
+        const bundledRuntimeEnv = resolveWindowsCuaRuntimeEnvironment();
+        if (bundledRuntimeEnv.ZCODE_CUA_RUNTIME_PACKAGE_DIR) {
+          const helper = await getOrCreateDefaultCuaProductHelper(context);
+          if (helper?.admissionTransport) {
+            const transport = helper.admissionTransport;
+            const marker = cuaBrokerRefreshMarkerPath(transport.socketPath);
+            cuaProductHelperEnv = {
+              ...bundledRuntimeEnv,
+              [BROKER_SOCKET_ENV]: transport.socketPath,
+              [ZCODE_CUA_PLUGIN_AUTHORITY_ENV_KEY]: transport.pluginAuthority,
+              ...(marker ? { ZCODE_CUA_PERMISSION_BROKER_REFRESH_MARKER: marker } : {}),
+            };
+          } else {
+            cuaProductHelperEnv = {
+              [BROKER_UNAVAILABLE_ENV]: "broker_unavailable: local CUA Host was not admitted",
+            };
+          }
+        }
+        if (process.platform === "win32" && !bundledRuntimeEnv.ZCODE_CUA_RUNTIME_PACKAGE_DIR) {
           const recipe = await resolveStableCuaWinRecipe();
           if (recipe) {
             cuaProductHelperEnv["ZCODE_CUA_WIN_HELPER_RECIPE"] = JSON.stringify({
@@ -2699,7 +2745,20 @@ export function createLocalServices(options: {
   // 避免开发场景下 resolver pass-through 而 helper 已建的割裂。
   const defaultCuaProductMcpServerResolver = createDynamicCuaProductMcpServerResolver({
     isPluginEnabled: (context) => isCuaEnabledForContext(context),
-    getResolver: async () => {
+    getResolver: async (context) => {
+      // 参考 JS runtime 没有新版 Windows recipe launcher；仅 bridge 路径由既有 Host
+      // 在启用的本地 MCP 准备边界完成启动，不能让 node_repl 永远连接一个未启动的 pipe。
+      if (
+        (process.platform === "win32" || process.platform === "darwin") &&
+        resolveWindowsCuaRuntimeEnvironment().ZCODE_CUA_RUNTIME_PACKAGE_DIR
+      ) {
+        return selectWindowsCuaHelperResolver({
+          bridgeEnabled: true,
+          acquire: () => getOrCreateDefaultCuaProductHelper(context),
+          peek: () => defaultCuaProductHelperLifecycle.peek()?.helper,
+          isCurrent: isDefaultCuaProductHelperCurrent,
+        });
+      }
       // peek-only——resolver 属托管 host 体系，host 未建时返回 undefined（懒启动下
       // CUA 经 node_repl + 稳定 socket，不依赖此 resolver）；绝不在此 acquire。
       const helper = defaultCuaProductHelperLifecycle.peek()?.helper;
@@ -2707,6 +2766,11 @@ export function createLocalServices(options: {
     },
     isResolverCurrent: (resolver) =>
       defaultCuaProductHelperLifecycle.peek()?.helper.resolver === resolver,
+    onPreparationError: (error) =>
+      createServiceLogger("cua-product-helper").warn(undefined, "CUA MCP preparation failed", {
+        errorName: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+      }),
   });
   const cuaProductMcpServerResolver =
     options?.cuaProductMcpServerResolver ?? defaultCuaProductMcpServerResolver;

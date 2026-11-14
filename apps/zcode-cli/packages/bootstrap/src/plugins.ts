@@ -499,6 +499,13 @@ export async function getZCodePluginsOverview(
     installedPlugins: installed.map((record) => {
       const enabled = configResult.config.plugins.enabledPlugins[record.id] ?? false;
       const data = toInstalledPluginData(record, enabled, loadedById.get(record.id));
+      if (record.id === ZCODE_CUA_OFFICIAL_PLUGIN_ID) {
+        return {
+          ...data,
+          version: loadedById.get(record.id)?.version ?? data.version,
+          updateStatus: "none" as const,
+        };
+      }
       const pin = latestPinByPluginId.get(record.id);
       const installedSha = readPluginSourceIdentityPin(record.source);
       const updateStatus = comparePluginUpdate({
@@ -1004,6 +1011,11 @@ export const updateZCodeMarketplacePlugin = pluginMutation(updateZCodeMarketplac
 async function updateZCodeMarketplacePluginLocked(
   options: UpdateZCodeMarketplacePluginOptions,
 ): Promise<ZCodePluginUpdateData> {
+  if (options.pluginId === ZCODE_CUA_OFFICIAL_PLUGIN_ID) {
+    throw new Error(
+      "Computer Use is a bundled software component; update the application to upgrade it.",
+    );
+  }
   const { pluginStorageRoot } = await resolvePluginContext(options);
   const record = listInstalledPluginRecords(pluginStorageRoot).find(
     (installed) => installed.id === options.pluginId,

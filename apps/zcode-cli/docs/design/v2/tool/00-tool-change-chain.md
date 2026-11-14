@@ -1,5 +1,13 @@
 # Tool Change Chain Spec
 
+## Bundled Computer Use
+
+Computer Use loads a fixed runtime from application resources. The existing local
+Host owns admission and native lifecycle; Agent, health and helper share its
+transport authority. Components are acquired, patched and signed at build time.
+They have no independent update or helper download path. See
+[the bundled component spec](../../../../../../specs/bundled-computer-use.md).
+
 工具 schema、顺序与描述是固定字节（tools 段字节进入缓存前缀）：`toToolJsonSchema` 按
 zod v4 toJSONSchema 的 key 顺序输出——`$schema` 在最前，`description`、`default` 在 `type` 前，
 数组的 `minItems`/`maxItems` 在 `type` 前，属性声明顺序不变；ToolSearch 输入 schema 走同一入口。

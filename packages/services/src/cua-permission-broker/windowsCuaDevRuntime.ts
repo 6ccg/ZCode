@@ -4,13 +4,16 @@ import type { Stats } from "node:fs";
 import * as fs from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep, win32 as windowsPath } from "node:path";
 
+const HELPER_ROOT_ENV = "ZCODE_CUA_HELPER_RUNTIME_PACKAGE_DIR";
 const DEV_ROOT_ENV = "ZCODE_CUA_DEV_ROOT";
 const EXPECTED_PACKAGE_NAME = "@zcode/zcode-cua";
+const PREBUILT_PACKAGE_NAME = "@zcode/zcode-cua-helper-runtime";
 const PACKAGE_JSON = "package.json";
 const PRODUCT_RUNTIME_MANIFEST = "runtime-manifest.json";
 const PRODUCT_RUNTIME_SEGMENTS = ["tools", "cua-helper"] as const;
 
 export interface WindowsCuaRuntime {
+  source?: "development-source" | "development-prebuilt" | "packaged";
   root: string;
   entryPath: string;
   addonPath: string;
@@ -72,7 +75,7 @@ const defaultHashBytes = async (bytes: string | Uint8Array): Promise<string> =>
 
 /**
  * Windows 产品运行时解析边界：
- * - 显式开发目录具有最高优先级，配置错误时 fail closed，不能悄悄改用安装资源；
+ * - 显式 helper 目录优先于开发目录，配置错误时 fail closed，不能悄悄改用安装资源；
  * - 产品模式只读取 resources/tools/cua-helper，不搜索源码目录或 node_modules。
  */
 export async function resolveWindowsCuaRuntime(
@@ -85,9 +88,16 @@ export async function resolveWindowsCuaRuntime(
     );
   }
 
-  const configuredRoot = (options.env ?? process.env)[DEV_ROOT_ENV]?.trim();
+  const env = options.env ?? process.env;
+  const rootEnv = env[HELPER_ROOT_ENV]?.trim() ? HELPER_ROOT_ENV : DEV_ROOT_ENV;
+  const configuredRoot = env[rootEnv]?.trim();
   if (configuredRoot) {
-    return resolveDevelopmentRuntime(configuredRoot, options.fileSystem ?? defaultFileSystem);
+    return resolveDevelopmentRuntime(
+      configuredRoot,
+      options,
+      options.fileSystem ?? defaultFileSystem,
+      rootEnv,
+    );
   }
 
   return resolvePackagedRuntime(options, options.fileSystem ?? defaultFileSystem);
@@ -95,26 +105,33 @@ export async function resolveWindowsCuaRuntime(
 
 async function resolveDevelopmentRuntime(
   configuredRoot: string,
+  options: WindowsCuaRuntimeResolveOptions,
   fileSystem: WindowsCuaRuntimeFileSystem,
+  rootEnv: string,
 ): Promise<WindowsCuaRuntime> {
   const isHostAbsolute = isAbsolute(configuredRoot);
   const isWindowsAbsolute = windowsPath.isAbsolute(configuredRoot);
   if (!isHostAbsolute && !isWindowsAbsolute) {
     throw new WindowsCuaDevRuntimeResolutionError(
       "development-root-not-absolute",
-      `${DEV_ROOT_ENV} must be an absolute path.`,
+      `${rootEnv} must be an absolute path.`,
     );
   }
 
   // 构建和测试会在非 Windows 主机校验 Windows runtime；宿主 path.isAbsolute
   // 不认识 C:\ 路径，不能在进入可注入文件系统前误判为相对路径。
   const root = isHostAbsolute ? resolve(configuredRoot) : windowsPath.normalize(configuredRoot);
-  const rootRealPath = await requireDevelopmentRuntimeRoot(fileSystem, root);
+  const rootRealPath = await requireDevelopmentRuntimeRoot(fileSystem, root, rootEnv);
   const producerContract = await requireExpectedPackage(
     fileSystem,
     join(root, PACKAGE_JSON),
     rootRealPath,
   );
+
+  // 预打包目录不具备 producer 契约，必须走产品清单校验，不能伪装为源码构建。
+  if (producerContract.kind === "prebuilt") {
+    return resolveManifestRuntime(root, rootRealPath, options, fileSystem, producerContract);
+  }
 
   const entryPath = resolveManifestArtifact(root, producerContract.entry, "entry");
   await requireContainedRegularArtifact(
@@ -137,6 +154,7 @@ async function resolveDevelopmentRuntime(
   );
 
   return {
+    source: "development-source",
     root,
     entryPath,
     addonPath,
@@ -182,6 +200,16 @@ async function resolvePackagedRuntime(
 
   const root = resolve(resourcesPath, ...PRODUCT_RUNTIME_SEGMENTS);
   const rootRealPath = await requirePackagedRuntimeRoot(fileSystem, root);
+  return resolveManifestRuntime(root, rootRealPath, options, fileSystem);
+}
+
+async function resolveManifestRuntime(
+  root: string,
+  rootRealPath: string,
+  options: WindowsCuaRuntimeResolveOptions,
+  fileSystem: WindowsCuaRuntimeFileSystem,
+  prebuilt?: { packageVersion: string; entry: string },
+): Promise<WindowsCuaRuntime> {
   const manifestPath = join(root, PRODUCT_RUNTIME_MANIFEST);
   const manifest = await readRuntimeManifest(fileSystem, manifestPath, rootRealPath);
   validateRuntimeManifest(manifest, {
@@ -189,6 +217,16 @@ async function resolvePackagedRuntime(
     electronVersion: options.electronVersion ?? process.versions.electron,
   });
 
+  if (
+    prebuilt &&
+    (prebuilt.packageVersion !== manifest.packageVersion || prebuilt.entry !== manifest.entry)
+  ) {
+    throw new WindowsCuaDevRuntimeResolutionError(
+      "invalid-package",
+      "Windows CUA prebuilt package version/main must match its runtime manifest.",
+      PACKAGE_JSON,
+    );
+  }
   const entryPath = resolveManifestArtifact(root, manifest.entry, "entry");
   const addonPath = resolveManifestArtifact(root, manifest.addon, "addon");
   await Promise.all([
@@ -217,8 +255,10 @@ async function resolvePackagedRuntime(
   const [entryHash, addonHash] = await Promise.all([hashBytes(entryBytes), hashBytes(addonBytes)]);
   requireArtifactHash(entryHash, manifest.sha256.entry, "entry");
   requireArtifactHash(addonHash, manifest.sha256.addon, "addon");
+  requirePortableExecutable(addonBytes, manifest.arch);
 
   return {
+    source: prebuilt ? "development-prebuilt" : "packaged",
     root,
     entryPath,
     addonPath,
@@ -320,7 +360,7 @@ function validateRuntimeManifest(
   if (compatible) return;
   throw new WindowsCuaDevRuntimeResolutionError(
     "incompatible-runtime-manifest",
-    `Windows CUA packaged runtime ${PRODUCT_RUNTIME_MANIFEST} is incompatible with this runtime.`,
+    `Windows CUA packaged runtime ${PRODUCT_RUNTIME_MANIFEST} does not match the verified runtime policy. Electron version mismatch means unverified compatibility, not proven Node-API incompatibility.`,
     PRODUCT_RUNTIME_MANIFEST,
   );
 }
@@ -328,6 +368,7 @@ function validateRuntimeManifest(
 async function requireDevelopmentRuntimeRoot(
   fileSystem: WindowsCuaRuntimeFileSystem,
   root: string,
+  rootEnv: string,
 ): Promise<string> {
   try {
     const stats = await lstatFile(fileSystem, root);
@@ -343,7 +384,7 @@ async function requireDevelopmentRuntimeRoot(
   } catch {
     throw new WindowsCuaDevRuntimeResolutionError(
       "development-root-not-found",
-      `${DEV_ROOT_ENV} must reference an existing regular directory.`,
+      `${rootEnv} must reference an existing regular directory.`,
     );
   }
 }
@@ -522,7 +563,10 @@ async function requireExpectedPackage(
   fileSystem: WindowsCuaRuntimeFileSystem,
   packagePath: string,
   rootRealPath: string,
-): Promise<{ packageVersion: string; entry: string; addon: string }> {
+): Promise<
+  | { kind: "source"; packageVersion: string; entry: string; addon: string }
+  | { kind: "prebuilt"; packageVersion: string; entry: string }
+> {
   try {
     const stats = await lstatFile(fileSystem, packagePath);
     if (!stats.isFile() || stats.isSymbolicLink()) {
@@ -536,6 +580,16 @@ async function requireExpectedPackage(
     if (typeof contents !== "string") throw new Error("package.json is not text");
     const pkg: unknown = JSON.parse(contents);
     if (!isPlainRecord(pkg)) throw new Error("package.json is not an object");
+    if (pkg.name === PREBUILT_PACKAGE_NAME) {
+      if (
+        !isNonEmptyTrimmedString(pkg.version) ||
+        pkg.type !== "module" ||
+        !isCanonicalRelativeArtifactPath(pkg.main)
+      ) {
+        throw new Error("prebuilt package metadata is incompatible");
+      }
+      return { kind: "prebuilt", packageVersion: pkg.version, entry: pkg.main };
+    }
     const contract = pkg.zcodeCuaRuntime;
     if (
       pkg.name !== EXPECTED_PACKAGE_NAME ||
@@ -552,6 +606,7 @@ async function requireExpectedPackage(
       throw new Error("package runtime contract is incompatible");
     }
     return {
+      kind: "source",
       packageVersion: pkg.version,
       entry: contract.windows.entry,
       addon: contract.windows.nativeAddon,
@@ -561,11 +616,32 @@ async function requireExpectedPackage(
   }
   throw new WindowsCuaDevRuntimeResolutionError(
     "invalid-package",
-    `Windows CUA development root package.json must name ${EXPECTED_PACKAGE_NAME} and expose a valid zcodeCuaRuntime contract.`,
+    `Windows CUA development root package.json must name ${EXPECTED_PACKAGE_NAME} and expose a valid zcodeCuaRuntime contract, or name ${PREBUILT_PACKAGE_NAME} with valid prebuilt metadata.`,
     PACKAGE_JSON,
   );
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requirePortableExecutable(bytes: string | Uint8Array, arch: NodeJS.Architecture): void {
+  // 哈希只证明清单与文件一致，不能证明该文件属于 Windows 目标架构。
+  const buffer = Buffer.from(bytes);
+  const offset = buffer.length >= 64 ? buffer.readUInt32LE(60) : -1;
+  const expectedMachine = arch === "x64" ? 0x8664 : 0xaa64;
+  if (
+    buffer.length >= 64 &&
+    buffer.readUInt16LE(0) === 0x5a4d &&
+    offset >= 64 &&
+    offset <= buffer.length - 6 &&
+    buffer.readUInt32LE(offset) === 0x00004550 &&
+    buffer.readUInt16LE(offset + 4) === expectedMachine
+  )
+    return;
+  throw new WindowsCuaDevRuntimeResolutionError(
+    "incompatible-runtime-manifest",
+    "Windows CUA native addon must be a PE binary matching the manifest architecture.",
+    "addon",
+  );
 }
