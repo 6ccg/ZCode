@@ -19,6 +19,10 @@ import { createRuntimeModel } from "./runtime-model.js";
 import { cloneModelSelection } from "../model-selection.js";
 import { auxiliaryModelOptions } from "../../model/auxiliary-model-options.js";
 import { getOffPeakExecution } from "../off-peak/runtime.js";
+import {
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
 
 export interface TitleModelContext {
   selection: ModelSelection | undefined;
@@ -139,9 +143,7 @@ async function generateTitleCandidateImpl(
     selection: requestedModelSelection,
     requestDependencies: context.requestDependencies,
   });
-  const model = baseModel.bind(
-    auxiliaryModelOptions(baseModel, context.auxiliaryReasoningLevel),
-  );
+  const model = baseModel.bind(auxiliaryModelOptions(baseModel, context.auxiliaryReasoningLevel));
   const modelSelection = cloneModelSelection(requestedModelSelection);
   const modelTraceContext = createChildTraceContext(options.traceContext, {
     attributes: {
@@ -151,7 +153,9 @@ async function generateTitleCandidateImpl(
     },
   });
   const events: SessionEvent[] = [];
-  const messages = buildTitleMessages(input);
+  const overrides =
+    (await this.builtinPromptSource?.readOverrides()) ?? this.config.builtinPromptOverrides;
+  const messages = buildTitleMessages(input, overrides);
   const modelRequestEvent = this.createEvent(
     SessionEventType.ModelRequest,
     {
@@ -266,9 +270,13 @@ export function normalizeTitleInput(input: string): string {
     : normalized;
 }
 
-function buildTitleMessages(input: string): ModelInputMessage[] {
+function buildTitleMessages(
+  input: string,
+  overrides?: BuiltinPromptOverrides,
+): ModelInputMessage[] {
+  const system = renderBuiltinPromptOverride("auxiliary.title", overrides);
   return [
-    { role: "system", content: SESSION_TITLE_SYSTEM_PROMPT },
+    { role: "system", content: system ?? SESSION_TITLE_SYSTEM_PROMPT },
     { role: "user", content: normalizeTitleInput(input) },
   ];
 }

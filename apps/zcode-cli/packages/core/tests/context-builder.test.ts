@@ -75,7 +75,11 @@ function metaAttachment(
 function memoryFixture(
   name: "main-memory-default-index.md" | "main-memory-index.md" | "main-memory-semantic-recall.md",
 ): string {
-  const content = readFileSync(new URL(`./fixtures/memory/${name}`, import.meta.url), "utf8");
+  // Windows 检出可能把夹具转成 CRLF；提示词固定使用 LF，先统一换行再比较正文。
+  const content = readFileSync(
+    new URL(`./fixtures/memory/${name}`, import.meta.url),
+    "utf8",
+  ).replace(/\r\n/g, "\n");
   return content.endsWith("\n") ? content.slice(0, -1) : content;
 }
 

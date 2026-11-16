@@ -1,6 +1,7 @@
 import type { AppSettings } from "@zcode/shared";
 import { ServiceChannels } from "@zcode/shared";
 import { createServiceDescriptor } from "../descriptors.js";
+import type { BuiltinPromptId, BuiltinPromptOverrides } from "@zcode/shared/builtin-prompts";
 
 /** Host 私有装配端口：只读取本机已提交目录，禁止递归读取设置或网络。 */
 export type WorkspaceSettingsProjection = Pick<
@@ -10,6 +11,9 @@ export type WorkspaceSettingsProjection = Pick<
 
 export interface ISettingService {
   get(): Promise<AppSettings>;
+  getBuiltinPrompts(): Promise<BuiltinPromptOverrides>;
+  /** null 恢复当前版本默认；写入独立文件，不修改原版 setting.json。 */
+  setBuiltinPrompt(id: BuiltinPromptId, template: string | null): Promise<BuiltinPromptOverrides>;
   /** 完整连接映射写入必须传入原快照和操作版本；服务在锁内比较并递增版本。 */
   update(
     patch: Partial<AppSettings>,

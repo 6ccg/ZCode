@@ -3,6 +3,7 @@ import type { ModelRequestSessionFeature } from "@zcode/contracts";
 import type { PromptSnapshot } from "./helpers/prompt-snapshot.js";
 import type { TotalTokensBudgetState } from "./helpers/total-tokens-budget.js";
 import type { InstructionRefreshReason } from "../context/types.js";
+import type { BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 import type {
   Logger,
   ModelSelection,
@@ -130,6 +131,7 @@ export interface AgentRuntimeInternal
   memoryDreamLastScanAtMs: number;
   pendingMemoryUpdate?: ProjectMemoryUpdate;
   contextSourcePort?: ContextSourcePort;
+  builtinPromptSource?: BuiltinPromptSource;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
   mcpStartupPromise?: Promise<McpConnectionSnapshot>;

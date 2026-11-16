@@ -1,6 +1,10 @@
 import { TOTAL_TOKENS_SYSTEM_LINE } from "./total-tokens.js";
 import type { ContextSection } from "./types.js";
 import { estimateTokens } from "./utils.js";
+import {
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
 
 const COMMUNICATION_PROMPT =
   "Write code that reads like the surrounding code: match its comment density, naming, and idiom.";
@@ -22,6 +26,7 @@ const ACT_DONT_REDERIVE_PROMPT =
 export function buildSessionGuidanceSection(
   toolNames: readonly string[],
   hasSkills = false,
+  overrides?: BuiltinPromptOverrides,
 ): ContextSection | null {
   const tools = new Set(toolNames);
   const lines = ["# Session-specific guidance"];
@@ -59,22 +64,28 @@ export function buildSessionGuidanceSection(
   }
 
   // 只有存在实际 session guidance 时才输出本段，避免向 simple branch 注入空标题。
-  return createDynamicSection("Session-specific guidance", "session_guidance", lines.join("\n"));
-}
-
-export function buildDynamicBehaviorSection(): ContextSection {
   return createDynamicSection(
-    "Dynamic Behavior",
-    "dynamic_behavior",
-    [COMMUNICATION_PROMPT, PRONOUNS_PROMPT, ACTION_CAUTION_PROMPT].join("\n\n"),
+    "Session-specific guidance",
+    "session_guidance",
+    renderBuiltinPromptOverride("main.sessionGuidance", overrides) ?? lines.join("\n"),
   );
 }
 
-export function buildContextManagementSection(): ContextSection {
+export function buildDynamicBehaviorSection(overrides?: BuiltinPromptOverrides): ContextSection {
+  return createDynamicSection(
+    "Dynamic Behavior",
+    "dynamic_behavior",
+    renderBuiltinPromptOverride("main.behavior", overrides) ??
+      [COMMUNICATION_PROMPT, PRONOUNS_PROMPT, ACTION_CAUTION_PROMPT].join("\n\n"),
+  );
+}
+
+export function buildContextManagementSection(overrides?: BuiltinPromptOverrides): ContextSection {
   return createDynamicSection(
     "Context Management",
     "context_management",
-    [CONTEXT_MANAGEMENT_PROMPT, ACT_DONT_REDERIVE_PROMPT].join("\n\n"),
+    renderBuiltinPromptOverride("main.contextManagement", overrides) ??
+      [CONTEXT_MANAGEMENT_PROMPT, ACT_DONT_REDERIVE_PROMPT].join("\n\n"),
   );
 }
 

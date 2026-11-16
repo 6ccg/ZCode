@@ -103,7 +103,7 @@ export class ContextBuilder {
     // 1. CLI / 产品前缀。工作流子代理只向脚本返回结果，
     // 不使用面向用户交互的身份前缀，直接以工作流身份开头。
     if (!isWorkflowActor) {
-      sections.push(buildCliPrefixSection());
+      sections.push(buildCliPrefixSection(this.config.builtinPromptOverrides));
     }
 
     // 2. Stable agent behavior or custom prompt body
@@ -120,7 +120,13 @@ export class ContextBuilder {
     } else if (workflowActor !== undefined) {
       sections.push(buildWorkflowActorIdentitySection(workflowActor, midConversationSystem));
     } else {
-      sections.push(buildIdentitySection(activeOutputStyle, midConversationSystem));
+      sections.push(
+        buildIdentitySection(
+          activeOutputStyle,
+          midConversationSystem,
+          this.config.builtinPromptOverrides,
+        ),
+      );
     }
 
     // 环境与模型是运行时公告（meta_user），不进 system；使用自定义 prompt 时也照常发送。
@@ -137,12 +143,17 @@ export class ContextBuilder {
     // guidance——契约里已把 Report outcomes faithfully 搬过去），保留 memory 与其后各段。
     if (!hasCustomSystemPrompt) {
       if (!isWorkflowActor && this.config.presentationSurface === "zcode_desktop") {
-        sections.push(buildDesktopContextSection(Boolean(this.config.genUiOutputDirectory)));
+        sections.push(
+          buildDesktopContextSection(
+            Boolean(this.config.genUiOutputDirectory),
+            this.config.builtinPromptOverrides,
+          ),
+        );
       }
 
       // behaviour part right after stable sp...
       if (!isWorkflowActor) {
-        sections.push(buildDynamicBehaviorSection());
+        sections.push(buildDynamicBehaviorSection(this.config.builtinPromptOverrides));
       }
 
       // Session-specific guidance
@@ -151,6 +162,7 @@ export class ContextBuilder {
         : buildSessionGuidanceSection(
             this.config.guidanceToolNames ?? [],
             (this.config.skills?.skills.length ?? 0) > 0,
+            this.config.builtinPromptOverrides,
           );
       if (sessionGuidanceSection) {
         sections.push(sessionGuidanceSection);
@@ -161,6 +173,7 @@ export class ContextBuilder {
         const memorySection = buildMemorySection(
           this.config.memoryRoot,
           ACTIVE_PROJECT_MEMORY_RETRIEVAL_BRANCH,
+          this.config.builtinPromptOverrides,
         );
         if (memorySection) {
           sections.push(memorySection);
@@ -169,7 +182,7 @@ export class ContextBuilder {
       sections.push(...environmentSections);
 
       // Context Management
-      sections.push(buildContextManagementSection());
+      sections.push(buildContextManagementSection(this.config.builtinPromptOverrides));
       sections.push(buildTotalTokensSection());
 
       const gitSystemContextSection = buildGitSystemContextSection(this.config.envInfo);

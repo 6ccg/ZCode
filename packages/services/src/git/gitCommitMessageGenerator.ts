@@ -6,6 +6,11 @@ import type {
   ZCodeWorkspaceGenerateTextParams,
 } from "@zcode/shared";
 import type { ServiceLogger } from "#src/logger/serviceLogger.js";
+import {
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+  type BuiltinPromptSource,
+} from "@zcode/shared/builtin-prompts";
 
 const MAX_PROMPT_FILES = 20;
 const MAX_DIFF_FILES = 8;
@@ -38,6 +43,7 @@ export interface GitCommitMessageTextGenerator {
 }
 
 export interface GitCommitMessageGeneratorOptions {
+  builtinPromptSource?: BuiltinPromptSource;
   currentModelProvider: GitCommitMessageCurrentModelProvider;
   textGenerator: GitCommitMessageTextGenerator;
   logger?: ServiceLogger;
@@ -68,6 +74,7 @@ export class GitCommitMessageGenerator {
   }): Promise<{ message: string; providerId: string; model: string }> {
     const selection = await this.resolveCurrentModel(params);
     const prompt = buildGitCommitMessageGenerationPrompt({
+      builtinPromptOverrides: await this.options.builtinPromptSource?.readOverrides(),
       branchName: params.branchName,
       locale: params.locale,
       files: params.files,
@@ -173,6 +180,7 @@ export class GitCommitMessageGenerator {
 }
 
 function buildGitCommitMessageGenerationPrompt(params: {
+  builtinPromptOverrides?: BuiltinPromptOverrides;
   branchName: string | null;
   locale?: Locale;
   files: readonly GitFileChange[];
@@ -188,6 +196,15 @@ function buildGitCommitMessageGenerationPrompt(params: {
     .join("\n");
   const diffSummary = buildDiffSummary(params.diffs);
   const conversationSummary = buildConversationContextSummary(params.conversationContext);
+  const custom = renderBuiltinPromptOverride("auxiliary.gitCommit", params.builtinPromptOverrides);
+  if (custom !== undefined) {
+    // 覆盖只替换说明头；变更上下文仍由下方上游代码组装，以 "Current branch:" 行为分界。
+    const upstream = buildGitCommitMessageGenerationPrompt({
+      ...params,
+      builtinPromptOverrides: undefined,
+    });
+    return `${custom}\n${upstream.slice(upstream.indexOf("Current branch: "))}`;
+  }
 
   return [
     "Write exactly one Git commit message for the workspace changes below.",

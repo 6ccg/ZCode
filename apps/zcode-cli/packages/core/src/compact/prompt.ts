@@ -1,3 +1,8 @@
+import {
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
+
 const NO_TOOLS_PREAMBLE = `CRITICAL: Respond with TEXT ONLY. Do NOT call any tools.
 
 - Do NOT use Read, Bash, Grep, Glob, Edit, Write, or ANY other tool.
@@ -109,10 +114,17 @@ When you are using compact - please focus on test output and code changes. Inclu
 </example>
 `;
 
-export function buildCompactPrompt(customInstructions: string | undefined): string {
+export function buildCompactPrompt(
+  customInstructions: string | undefined,
+  overrides?: BuiltinPromptOverrides,
+): string {
   const customInstructionBlock = customInstructions?.trim()
     ? `\n\nAdditional Instructions:\n${customInstructions}`
     : "";
+  const custom = renderBuiltinPromptOverride("auxiliary.compact", overrides, {
+    custom_instructions: customInstructionBlock,
+  });
+  if (custom !== undefined) return custom;
 
   return `${NO_TOOLS_PREAMBLE}${BASE_COMPACT_PROMPT}${customInstructionBlock}${NO_TOOLS_TRAILER}`;
 }

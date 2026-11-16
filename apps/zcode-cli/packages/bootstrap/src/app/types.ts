@@ -1,5 +1,6 @@
 import type { OfficialPluginPreparation } from "./bundled-plugins.js";
 import type { OfficialCommandSessionObserver } from "../official-command-endpoint/index.js";
+import type { BuiltinPromptSource } from "@zcode/shared/builtin-prompts";
 import type { AiSdkModelAdapter } from "@zcode/adapters/model";
 import type { SessionControlBinding } from "@zcode/core/session-control";
 import type {
@@ -156,6 +157,7 @@ export interface ZCodeAppOptions {
    * 优先、否则工作目录。
    */
   workspaceKey?: string;
+  builtinPromptSource?: BuiltinPromptSource;
   sessionId?: SessionId;
   resume?: boolean;
   version?: string;

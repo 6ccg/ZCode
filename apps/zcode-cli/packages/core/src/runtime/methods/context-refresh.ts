@@ -248,7 +248,12 @@ function withDesktopContext(
   sessionId: string = runtime.sessionId,
   workspacePath?: string,
 ): EnvironmentSnapshot {
-  const { visualizationDirectory: _directory, desktopContext: _desktop, ...current } = snapshot;
+  const {
+    visualizationDirectory: _directory,
+    desktopContext: _desktop,
+    desktopContextContent: _desktopContent,
+    ...current
+  } = snapshot;
   if (
     !runtime.latestContextBuildResult?.sections.some(
       (section) => section.source === "desktop_context",
@@ -256,9 +261,17 @@ function withDesktopContext(
   )
     return current;
   const directory = resolveGenUiOutputDirectory(runtime, sessionId, workspacePath);
+  const desktop = runtime.latestContextBuildResult?.sections.find(
+    (section) => section.source === "desktop_context",
+  );
   return {
     ...current,
     desktopContext: true,
+    // 修复原因：桌面说明已改走环境公告；若只替换 ContextBuilder 文本，实际请求仍发送默认值。
+    // 将本实例的覆盖正文交给既有公告快照比较，清除覆盖后也能追加一次恢复默认的说明。
+    ...(runtime.config.builtinPromptOverrides?.["main.desktop"] !== undefined && desktop
+      ? { desktopContextContent: desktop.content }
+      : {}),
     ...(directory ? { visualizationDirectory: directory } : {}),
   };
 }

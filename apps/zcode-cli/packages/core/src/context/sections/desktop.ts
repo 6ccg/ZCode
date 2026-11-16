@@ -1,18 +1,33 @@
 import type { ContextSection } from "../types.js";
 import { estimateTokens } from "../utils.js";
+import {
+  DESKTOP_GEN_UI_INSTRUCTIONS,
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
 
 // Desktop 段由环境公告发送，不进 system：呈现面与灰度是进程级事实，Gen UI 目录随会话变化，
 // 而 system 由 prompt 快照冻结到压缩。section 只作开关与用量统计，正文见 buildDesktopContextContent。
-export function buildDesktopContextSection(hasGenUiOutputDirectory = false): ContextSection {
+export function buildDesktopContextSection(
+  hasGenUiOutputDirectory = false,
+  overrides?: BuiltinPromptOverrides,
+): ContextSection {
   return createDesktopSection(
     "ZCode Desktop Context",
     "desktop_context",
-    buildDesktopContextContent(hasGenUiOutputDirectory),
+    buildDesktopContextContent(hasGenUiOutputDirectory, overrides),
   );
 }
 
 /** Desktop 段正文；插件关闭时不提供输出目录，整段 Gen UI 上下文随之省略。 */
-export function buildDesktopContextContent(hasGenUiOutputDirectory: boolean): string {
+export function buildDesktopContextContent(
+  hasGenUiOutputDirectory: boolean,
+  overrides?: BuiltinPromptOverrides,
+): string {
+  const custom = renderBuiltinPromptOverride("main.desktop", overrides, {
+    gen_ui_instructions: hasGenUiOutputDirectory ? DESKTOP_GEN_UI_INSTRUCTIONS : "",
+  });
+  if (custom !== undefined) return custom;
   return [
     "# ZCode Desktop Context",
     "",

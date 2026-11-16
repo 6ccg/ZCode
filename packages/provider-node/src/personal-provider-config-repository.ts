@@ -87,6 +87,7 @@ export class NodePersonalProviderConfigRepository implements PersonalProviderCon
           defaultModelSelection: next.defaultModelSelection,
           modelCatalogs: next.modelCatalogs,
           auxiliaryModelSelection: next.auxiliaryModelSelection,
+          promptEnhancementModelSelection: next.promptEnhancementModelSelection,
         });
         const committed = await this.#writeLocked(update);
         const snapshot = snapshotFromUpdate(committed);
@@ -296,5 +297,6 @@ function snapshotFromUpdate(update: ProviderConfigLayerUpdate): ProviderConfigLa
     defaultModelSelection: update.defaultModelSelection,
     modelCatalogs: update.modelCatalogs ?? {},
     auxiliaryModelSelection: update.auxiliaryModelSelection,
+    promptEnhancementModelSelection: update.promptEnhancementModelSelection,
   });
 }

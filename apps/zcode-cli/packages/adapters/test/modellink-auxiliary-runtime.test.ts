@@ -268,6 +268,40 @@ test("runtime sends main, title and Git requests to configured protocols with se
       /reasoningLevel/,
     );
     assert.equal(requests.length, 3);
+    assert.equal(requests[0]!.body.max_output_tokens, 1024);
+    for (const [mode, selection] of [
+      ["organize", { ...main, options: { reasoningLevel: "high" } }],
+      [
+        "expand",
+        { providerId: "chat", modelId: "chat-model", options: { reasoningLevel: "high" } },
+      ],
+    ] as const) {
+      const enhanced = await runtime.generateWorkspaceText({
+        selection,
+        messages: [
+          { role: "system", content: "Enhance the draft without changing its scope." },
+          { role: "user", content: "Analyze the error before changing code." },
+        ],
+        querySource: `prompt_enhancement.${mode}`,
+      });
+      assert.equal(enhanced.text, "Test title");
+      const wire = requests.at(-1)!.body;
+      assert.equal(wire.model, selection.modelId);
+      assert.equal(wire.max_output_tokens ?? wire.max_completion_tokens ?? wire.max_tokens, 4096);
+      assert.equal(wire.reasoning?.effort ?? wire.reasoning_effort, "high");
+    }
+    assert.deepEqual(runtime.getSessionModelSelection(), main);
+    const beforeInvalidBudget = requests.length;
+    await assert.rejects(
+      runtime.generateWorkspaceText({
+        selection: main,
+        prompt: "Enhance this draft",
+        querySource: "prompt_enhancement.organize",
+        maxOutputTokens: 4097,
+      }),
+      /maxOutputTokens is outside/,
+    );
+    assert.equal(requests.length, beforeInvalidBudget);
     const tools: ModelToolContract[] = [
       {
         name: "Read",

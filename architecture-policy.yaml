@@ -1864,6 +1864,27 @@ exceptions:
       - apps/zcode-cli/packages/contracts/src/interfaces/model-catalog.port.ts
       - packages/ui/src/settings/model-provider-section/AuxiliaryModelSelector.tsx
     reason: fork ModelLink 与辅助模型（specs/modellink-providers.md）；ProviderConfigService 仍为唯一配置所有者，仅精确准入这些路径。
+  - id: fork-builtin-prompts
+    rule: unmanaged-new-file
+    paths:
+      - apps/zcode-cli/packages/adapters/src/context/builtin-prompts.ts
+      - packages/services/src/setting/builtinPromptWriter.ts
+      - packages/shared/src/fork/builtin-prompts/auxiliary.ts
+      - packages/shared/src/fork/builtin-prompts/index.ts
+      - packages/shared/src/fork/builtin-prompts/main.ts
+      - packages/shared/src/fork/builtin-prompts/prompt-enhancement.ts
+      - packages/shared/src/fork/builtin-prompts/subagents.ts
+      - packages/shared/src/fork/prompt-enhancement.ts
+      - packages/services/src/zcode-agent/promptEnhancementGenerator.ts
+      - packages/ui/src/hooks/useBuiltinPrompts.ts
+      - packages/ui/src/hooks/usePromptEnhancement.ts
+      - packages/ui/src/prompt-editor/promptEnhancementEditor.ts
+      - packages/ui/src/settings/BuiltinPromptsSection.tsx
+      - packages/ui/src/settings/PromptEnhancementSection.tsx
+      - packages/ui/src/v4/composer/PromptEnhancementControls.tsx
+      - packages/ui/src/v4/composer/PromptEnhancementFeedback.tsx
+      - packages/ui/src/v4/composer/promptEnhancementContext.ts
+    reason: fork 内置提示词覆盖层与提示词增强（specs/builtin-prompt-editor.md、specs/prompt-enhancement.md）；SettingService 唯一写入，CLI 只读快照，UI 通过 hook 访问。
 
   - id: region-copy-suggested-prompts-edit
     rule: unmanaged-new-file

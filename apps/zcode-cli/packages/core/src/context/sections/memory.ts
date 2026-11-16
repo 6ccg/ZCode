@@ -4,15 +4,26 @@
 
 import type { ContextSection } from "../types.js";
 import { estimateTokens } from "../utils.js";
+import {
+  MEMORY_INDEX_INSTRUCTIONS,
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
 import type { ProjectMemoryRetrievalBranch } from "../../memory/project-memory-retrieval-branch.js";
 
 export function buildMemorySection(
   memoryRoot: string | undefined,
   retrievalBranch: ProjectMemoryRetrievalBranch,
+  overrides?: BuiltinPromptOverrides,
 ): ContextSection | null {
   if (!memoryRoot) return null;
 
-  const content = buildMemoryContent(memoryRoot, retrievalBranch);
+  const content =
+    renderBuiltinPromptOverride("main.memory", overrides, {
+      memory_root: memoryRoot,
+      memory_index_instructions:
+        retrievalBranch === "default-index" ? MEMORY_INDEX_INSTRUCTIONS : "",
+    }) ?? buildMemoryContent(memoryRoot, retrievalBranch);
 
   return {
     name: "Memory",

@@ -5,6 +5,10 @@
 import type { ContextSection } from "../types.js";
 import type { OutputStylePromptConfig } from "../types.js";
 import { estimateTokens } from "../utils.js";
+import {
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
 
 const DEFAULT_AGENT_IDENTITY =
   "You are an agent working with the user toward their goals, using your own judgment along the way.";
@@ -43,8 +47,14 @@ export function buildHarnessBlock(midConversationSystem = true): string {
 function buildIdentityPrompt(
   outputStyle: OutputStylePromptConfig | undefined,
   midConversationSystem: boolean,
+  overrides?: BuiltinPromptOverrides,
 ): string {
   const intro = outputStyle ? OUTPUT_STYLE_AGENT_IDENTITY : DEFAULT_AGENT_IDENTITY;
+  const custom = renderBuiltinPromptOverride("main.identity", overrides, {
+    identity_intro: intro,
+    harness_block: buildHarnessBlock(midConversationSystem),
+  });
+  if (custom !== undefined) return custom;
 
   const identityLines = ["", intro, "", SECURITY_NOTICE].join("\n");
 
@@ -54,8 +64,9 @@ function buildIdentityPrompt(
 export function buildIdentitySection(
   outputStyle?: OutputStylePromptConfig,
   midConversationSystem = true,
+  overrides?: BuiltinPromptOverrides,
 ): ContextSection {
-  const content = buildIdentityPrompt(outputStyle, midConversationSystem);
+  const content = buildIdentityPrompt(outputStyle, midConversationSystem, overrides);
 
   return {
     name: "Agent Identity",

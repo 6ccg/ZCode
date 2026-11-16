@@ -4,6 +4,10 @@ import { isHiddenReminderMessage } from "../runtime/helpers/conversation.js";
 import { resolveContainedMemoryFilePath } from "./memory-file-path.js";
 import { formatMemoryManifest } from "./recall/manifest.js";
 import type { MemoryManifestEntry } from "./recall/types.js";
+import {
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
 
 const MINIMUM_USER_WORDS = 3;
 
@@ -42,6 +46,7 @@ export interface MemoryExtractionScheduler<
 }
 
 export function buildMemoryExtractionPrompt(input: {
+  builtinPromptOverrides?: BuiltinPromptOverrides;
   manifest: readonly MemoryManifestEntry[];
   messageCount: number;
 }): string {
@@ -49,6 +54,12 @@ export function buildMemoryExtractionPrompt(input: {
     input.manifest.length > 0
       ? `\n\n## Existing memory files\n\n${formatMemoryManifest(input.manifest)}\n\nCheck this list before writing \u2014 update an existing file rather than creating a duplicate.`
       : "";
+  const custom = renderBuiltinPromptOverride(
+    "auxiliary.memoryExtraction",
+    input.builtinPromptOverrides,
+    { message_count: String(input.messageCount), existing_memories: existingMemories },
+  );
+  if (custom !== undefined) return custom;
 
   return [
     `You are now acting as the memory extraction subagent. Analyze the most recent ~${input.messageCount} messages above and use them to update your persistent memory systems.`,

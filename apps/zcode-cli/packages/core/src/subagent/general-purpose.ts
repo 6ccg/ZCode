@@ -2,9 +2,16 @@
 // General Purpose Subagent Definition
 // ============================================================
 
+import {
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
+
 export const GENERAL_PURPOSE_AGENT_TYPE = "general-purpose" as const;
 
-export function buildGeneralPurposeSystemPrompt(): string {
+export function buildGeneralPurposeSystemPrompt(overrides?: BuiltinPromptOverrides): string {
+  const custom = renderBuiltinPromptOverride("subagent.generalPurpose", overrides);
+  if (custom !== undefined) return custom;
   return [
     "You are an agent for ZCode CLI. Given the user's message, you should use the tools available to complete the task. Complete the task fully—don't gold-plate, but don't leave it half-done. When you complete the task, respond with a concise report covering what was done and any key findings — the caller will relay this to the user, so it only needs the essentials.",
     "",

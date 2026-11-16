@@ -650,6 +650,106 @@ const enUS: Record<string, string> = {
   "remote.phase.channel.ssh": "Connecting to SSH host",
   "remote.phase.channel.wsl": "Starting and connecting to distribution",
   "remote.phase.channel.docker": "Connecting to container",
+  "chat.promptEnhancement.organize.short": "Polish",
+  "chat.promptEnhancement.organize.title": "Organize wording",
+  "chat.promptEnhancement.organize.undo": "Undo wording changes",
+  "chat.promptEnhancement.organize.stop": "Stop organizing wording",
+  "chat.promptEnhancement.expand.short": "Expand",
+  "chat.promptEnhancement.expand.title": "Expand requirements",
+  "chat.promptEnhancement.expand.undo": "Undo requirement expansion",
+  "chat.promptEnhancement.expand.stop": "Stop expanding requirements",
+  "chat.promptEnhancement.undo": "Undo",
+  "chat.promptEnhancement.stop": "Stop",
+  "chat.promptEnhancement.rightClickHint":
+    "Right-click for enhancement settings. Review the result before sending.",
+  "chat.promptEnhancement.empty": "Write a draft before polishing or expanding it.",
+  "chat.promptEnhancement.modelUnavailable":
+    "The enhancement model or reasoning level is not ready. Check prompt enhancement settings.",
+  "chat.promptEnhancement.connectionUnavailable":
+    "The workspace is connecting. Enhancements will be available when it is ready.",
+  "chat.promptEnhancement.editorUnavailable":
+    "The editor is not ready or text composition is still active. Try again shortly.",
+  "chat.promptEnhancement.undoUnavailable":
+    "The draft or undo history has changed; the original cannot be restored in one step.",
+  "chat.promptEnhancement.failed": "Enhancement failed: {detail}",
+  "chat.promptEnhancement.resultStale":
+    "The draft or references changed. The result is available without replacing your input.",
+  "chat.promptEnhancement.protectedChanged":
+    "The result did not preserve all references or code. It is available for review without replacing your input.",
+  "chat.promptEnhancement.includeConversation": "Include current conversation",
+  "chat.promptEnhancement.draftOnly": "Use only the current draft",
+  "chat.promptEnhancement.viewResult": "View result",
+  "chat.promptEnhancement.resultTitle": "Enhanced prompt",
+  "chat.promptEnhancement.copy": "Copy result",
+  "chat.promptEnhancement.copied": "Result copied",
+  "chat.promptEnhancement.copyFailed": "Copy failed. Select the result text to copy it manually.",
+  "settings.promptEnhancement.title": "Prompt enhancement",
+  "settings.promptEnhancement.description":
+    "Configure the model and prompts for polishing and expanding drafts. Saved changes apply to the next enhancement.",
+  "settings.promptEnhancement.open": "Prompt enhancement settings…",
+  "settings.promptEnhancement.modelTitle": "Prompt enhancement model",
+  "settings.promptEnhancement.modelDescription":
+    "Used only for polishing and expanding drafts. It does not change conversation, title, or Git model selections.",
+  "settings.promptEnhancement.modelFollow": "Follow auxiliary model",
+  "settings.promptEnhancement.modelReasoning": "Enhancement reasoning level",
+  "settings.promptEnhancement.modelUnavailable":
+    "The enhancement model or reasoning level is unavailable. Choose it again.",
+  "settings.promptEnhancement.modelLoading": "Loading model settings…",
+  "settings.promptEnhancement.manageModels": "Manage models",
+  "settings.promptEnhancement.organize": "Organize wording",
+  "settings.promptEnhancement.expand": "Expand requirements",
+  "settings.promptEnhancement.followDescription":
+    "Without an auxiliary model, enhancements follow the current composer model and reasoning level.",
+  "settings.builtinPrompts.variable.input":
+    "JSON data containing the draft and protected references or code",
+  "settings.builtinPrompts.variable.context":
+    "Selected reference metadata and optional conversation context; null when absent",
+  "settings.builtinPrompts.title": "Built-in prompts",
+  "settings.builtinPrompts.scope":
+    "Applies to this app host: your desktop computer, or the server connected to Web. Switching remote workspaces does not edit prompts on the remote host.",
+  "settings.builtinPrompts.activation":
+    "Main sessions and their subagents use new settings when a session or runtime is created. Auxiliary prompts apply to the next invocation. Requests already running keep their prompts.",
+  "settings.builtinPrompts.group.main": "Main agent",
+  "settings.builtinPrompts.group.subagent": "Built-in subagents",
+  "settings.builtinPrompts.group.auxiliary": "Auxiliary tasks",
+  "settings.builtinPrompts.modified": "Modified",
+  "settings.builtinPrompts.default": "Default",
+  "settings.builtinPrompts.editor": "Prompt text",
+  "settings.builtinPrompts.viewDefault": "View current default",
+  "settings.builtinPrompts.backToEdit": "Back to editing",
+  "settings.builtinPrompts.variables": "Keep these variables; the runtime fills them in:",
+  "settings.builtinPrompts.variable.identity_intro":
+    "Identity introduction for the active Output Style",
+  "settings.builtinPrompts.variable.memory_root": "Memory directory for this session",
+  "settings.builtinPrompts.variable.search_guidelines": "Guidance for the available search tools",
+  "settings.builtinPrompts.variable.bash_read_only_commands":
+    "Read-only commands for the active search mode",
+  "settings.builtinPrompts.variable.custom_instructions":
+    "Additional instructions for this compaction, or empty",
+  "settings.builtinPrompts.variable.message_count": "Number of messages being processed",
+  "settings.builtinPrompts.variable.existing_memories": "Existing memory files, or empty",
+  "settings.builtinPrompts.guidanceHint":
+    "Only injected when the Skill tool and skills are available. Editing does not change this condition.",
+  "settings.builtinPrompts.format.title":
+    "Session and goal titles share this template. Expected output is JSON with a title string field.",
+  "settings.builtinPrompts.format.gitCommit":
+    "The first line must use Conventional Commit format. Branch, file and diff context is appended automatically.",
+  "settings.builtinPrompts.format.compact":
+    "Preserve the expected analysis and summary tags. Conversation history is supplied by the runtime.",
+  "settings.builtinPrompts.save": "Save",
+  "settings.builtinPrompts.saving": "Saving…",
+  "settings.builtinPrompts.saved": "Prompt saved",
+  "settings.builtinPrompts.saveError": "Save failed: {error}",
+  "settings.builtinPrompts.discard": "Discard changes",
+  "settings.builtinPrompts.restore": "Restore default",
+  "settings.builtinPrompts.restoreDescription":
+    "Remove this override and use the current default. Any unsaved changes will also be discarded.",
+  "settings.builtinPrompts.unsaved": "Unsaved changes",
+  "settings.builtinPrompts.unsavedTitle": "Discard unsaved changes?",
+  "settings.builtinPrompts.unsavedDescription":
+    "This prompt has not been saved. Leaving will discard your draft.",
+  "settings.builtinPrompts.loading": "Loading prompt settings…",
+  "settings.builtinPrompts.retry": "Retry",
   "startPlan.recommendation.subagentDescription":
     "Your Start Plan has quota available for {model}. Switch this subagent’s model to the Start Plan?",
   "startPlan.recommendation.preferenceSaveFailed":

@@ -43,6 +43,8 @@ export type EnvironmentSnapshot = Pick<EnvInfo, "cwd" | "platform" | "shell" | "
   visualizationDirectory?: string;
   /** 本次运行在 ZCode Desktop 呈现面时为 true，环境块带 Desktop 段。旧元数据没有这个字段，算不在。 */
   desktopContext?: boolean;
+  /** 自定义桌面模板的已公告正文；默认模板继续按上游规则生成。 */
+  desktopContextContent?: string;
 };
 
 export interface EnvironmentAnnouncement {
@@ -90,6 +92,7 @@ export function parseEnvironmentAnnouncement(value: unknown): EnvironmentAnnounc
     additionalWorkingDirectories,
     visualizationDirectory,
     desktopContext,
+    desktopContextContent,
   } = snapshot as Record<string, unknown>;
   if (
     typeof cwd !== "string" ||
@@ -107,6 +110,8 @@ export function parseEnvironmentAnnouncement(value: unknown): EnvironmentAnnounc
   if (visualizationDirectory !== undefined && typeof visualizationDirectory !== "string")
     return undefined;
   if (desktopContext !== undefined && typeof desktopContext !== "boolean") return undefined;
+  if (desktopContextContent !== undefined && typeof desktopContextContent !== "string")
+    return undefined;
   return {
     full,
     snapshot: {
@@ -118,6 +123,7 @@ export function parseEnvironmentAnnouncement(value: unknown): EnvironmentAnnounc
       additionalWorkingDirectories: [...additionalWorkingDirectories],
       ...(visualizationDirectory === undefined ? {} : { visualizationDirectory }),
       ...(desktopContext === undefined ? {} : { desktopContext }),
+      ...(desktopContextContent === undefined ? {} : { desktopContextContent }),
     },
   };
 }
@@ -177,7 +183,8 @@ export function buildEnvironmentAnnouncement(
 /** 环境块里的 Desktop 段：不在 Desktop 时没有；在 Desktop 时按是否有 Gen UI 目录取写法。 */
 function desktopContextText(snapshot: EnvironmentSnapshot): string | undefined {
   return snapshot.desktopContext
-    ? buildDesktopContextContent(Boolean(snapshot.visualizationDirectory))
+    ? (snapshot.desktopContextContent ??
+        buildDesktopContextContent(Boolean(snapshot.visualizationDirectory)))
     : undefined;
 }
 

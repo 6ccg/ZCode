@@ -51,6 +51,8 @@ import {
   consumeInitialSettingsSection,
   consumePendingSettingsSourceServerId,
   consumePendingSettingsSourceServerDetails,
+  readPendingPromptEnhancementMode,
+  clearPendingPromptEnhancementMode,
   consumePendingSettingsPluginOrigin,
   consumePendingSettingsPluginScopeKey,
   consumePendingSettingsPluginTab,
@@ -95,6 +97,8 @@ import { HooksSection } from "@/settings/HooksSection.js";
 import { WorkspaceFileSearchSection } from "@/settings/WorkspaceFileSearchSection.js";
 import { MemorySettingsPage } from "@/settings/MemorySettingsSection.js";
 import { PersonalizationSection } from "@/settings/PersonalizationSection.js";
+import { BuiltinPromptsSection } from "@/settings/BuiltinPromptsSection.js";
+import { PromptEnhancementSection } from "@/settings/PromptEnhancementSection.js";
 import { BrowserSettingsSection } from "@/settings/BrowserSettingsSection.js";
 import { ComputerUseSection } from "@/settings/ComputerUseSection.js";
 import { ShortcutSettingsSection } from "@/settings/ShortcutSettingsSection.js";
@@ -312,7 +316,7 @@ export function SettingsPage({
   isWebRemoteControl = false,
   windowsWindowControlsRightPaddingPx: _windowsWindowControlsRightPaddingPx,
   captionWorkspacePath,
-  onBack,
+  onBack: onBackRequested,
   onOpenTask,
   onCreateTask,
   onOpenWorkspace,
@@ -354,6 +358,19 @@ export function SettingsPage({
   const usesInlineWindowControls = Boolean(isWindowsDesktop || isLinuxDesktop);
   const platform = usePlatform();
   const remoteWorkspaceController = useOptionalRemoteWorkspaceController();
+  const builtinPromptNavigationGuard = useRef<(() => Promise<boolean>) | null>(null);
+  const onBack = onBackRequested
+    ? () => {
+        void (async () => {
+          if (
+            builtinPromptNavigationGuard.current &&
+            !(await builtinPromptNavigationGuard.current())
+          )
+            return;
+          onBackRequested();
+        })();
+      }
+    : undefined;
   const [activeSection, setActiveSection] = useState<SettingsSectionId>(() => {
     const initialSection = consumeInitialSettingsSection("general");
     const visibleInitialSection = resolveSettingsSectionForPlatform(
@@ -429,6 +446,9 @@ export function SettingsPage({
       finishMarketingNavigation(marketingRequest.id);
     }
   }, [activeSection, marketingRequest, settingsSections]);
+  const [promptEnhancementMode, setPromptEnhancementMode] = useState(
+    () => readPendingPromptEnhancementMode() ?? "organize",
+  );
   const [pluginNavigationOrigin, setPluginNavigationOrigin] = useState(() =>
     consumePendingSettingsPluginOrigin(),
   );
@@ -441,6 +461,7 @@ export function SettingsPage({
     // Marketplace 只返回 User 已安装视图；Workspace 仍通过设置页自身的配置层切换进入。
     clearPendingSettingsPluginOrigin();
     clearPendingSettingsPluginScopeKey();
+    clearPendingPromptEnhancementMode();
   }, []);
   const [settingsBreadcrumbItems, setSettingsBreadcrumbItems] = useState<
     readonly SettingsBreadcrumbItem[]
@@ -708,11 +729,22 @@ export function SettingsPage({
   const openOccupationOnboarding = () => setNewUserOnboardingOpen(true);
   const requestMigrationDialog = useZCodeStore((state) => state.requestOnboardingDialog);
   const setActiveSettingsSection = useCallback(
-    (section: SettingsSectionId, fallbackSection: SettingsSectionId = activeSection) => {
+    async (
+      section: SettingsSectionId,
+      fallbackSection: SettingsSectionId = activeSection,
+      guardSameSection = false,
+    ) => {
+      if (
+        (section !== activeSection || guardSameSection) &&
+        builtinPromptNavigationGuard.current &&
+        !(await builtinPromptNavigationGuard.current())
+      )
+        return false;
       const resolvedSection = resolveSettingsSection(section, fallbackSection);
       setSearchTarget(null);
       setActiveSection(resolvedSection);
       writeLastSettingsSectionPreference(resolvedSection);
+      return true;
     },
     [activeSection],
   );
@@ -884,6 +916,14 @@ export function SettingsPage({
   useEffect(
     () =>
       addPendingSettingsSectionListener((section, detail) => {
+        if (section === "promptEnhancement") {
+          void setActiveSettingsSection(section, activeSection, true).then((accepted) => {
+            if (!accepted) return;
+            setPromptEnhancementMode(detail?.promptEnhancementMode ?? "organize");
+            setSettingsSectionNavigationVersion((version) => version + 1);
+          });
+          return;
+        }
         // SettingsPage 已打开时再次从 quickpick 点“个性化/MCP”等设置入口，
         // 页面不会重新挂载，之前写入的 pending section 无人消费，看起来像点击没反应。
         // 这里订阅同窗口跳转意图，立即切换当前设置分区。
@@ -2089,6 +2129,16 @@ export function SettingsPage({
                             <PersonalizationSection
                               settingService={localHostServices.settingService}
                               isDesktop={Boolean(isDesktop)}
+                            />
+                          ) : activeSection === "builtinPrompts" ? (
+                            <BuiltinPromptsSection
+                              navigationGuardRef={builtinPromptNavigationGuard}
+                            />
+                          ) : activeSection === "promptEnhancement" ? (
+                            <PromptEnhancementSection
+                              key={`prompt-enhancement:${settingsSectionNavigationVersion}`}
+                              initialMode={promptEnhancementMode}
+                              navigationGuardRef={builtinPromptNavigationGuard}
                             />
                           ) : activeSection === "memory" ? (
                             <MemorySettingsPage

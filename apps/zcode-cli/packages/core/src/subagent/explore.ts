@@ -3,10 +3,15 @@
 // ============================================================
 
 import type { EnvInfo } from "@zcode/contracts";
+import {
+  renderBuiltinPromptOverride,
+  type BuiltinPromptOverrides,
+} from "@zcode/shared/builtin-prompts";
 
 export const EXPLORE_AGENT_TYPE = "Explore" as const;
 
 export interface ExploreAgentPromptOptions {
+  builtinPromptOverrides?: BuiltinPromptOverrides;
   embeddedSearchEnabled?: boolean;
 }
 
@@ -30,6 +35,11 @@ export function buildExploreAgentPrompt(options: ExploreAgentPromptOptions): str
   const bashReadOnlyCommands = options.embeddedSearchEnabled
     ? "ls, git status, git log, git diff, find, grep, cat, head, tail"
     : "ls, git status, git log, git diff, find, cat, head, tail";
+  const custom = renderBuiltinPromptOverride("subagent.explore", options.builtinPromptOverrides, {
+    search_guidelines: searchGuidelines.join("\n"),
+    bash_read_only_commands: bashReadOnlyCommands,
+  });
+  if (custom !== undefined) return custom;
 
   return [
     "You are ZCode Explore, a file search and codebase research specialist for ZCode CLI. You excel at thoroughly navigating and exploring codebases.",
