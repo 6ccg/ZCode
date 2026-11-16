@@ -1830,6 +1830,19 @@ modules:
       adapters: .
     owner: agent
 
+  # ── fork patches: modules（修改版补丁登记，集中在此块，rebase 时整块保留） ──
+  - id: zcode-cua-source
+    roots:
+      - packages/zcode-cua/src
+    managed: true
+    requires: []
+    publicEntrypoints:
+      - packages/zcode-cua/src/external-windows-runtime.js
+      - packages/zcode-cua/src/contract.ts
+    layers:
+      adapters: .
+    owner: desktop
+
 global:
   # 临时时间戳（2026-09-10）：unmanaged-new-file 只约束此日期之后首次入库的文件。
   # 基于领先 staging 很多的分支开工时，merge-base 之前的"新增"文件不应被追溯。

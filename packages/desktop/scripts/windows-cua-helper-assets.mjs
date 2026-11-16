@@ -1,7 +1,17 @@
 /* eslint-disable max-lines -- staging 与 afterPack verifier 共用同一发布契约，保持同模块避免 schema/PE 规则漂移。 */
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { cp, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  lstat,
+  mkdir,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import {
   basename,
   dirname,
@@ -18,6 +28,7 @@ import { collectRuntimeModuleClosureEntries } from "./runtime-dependency-closure
 import { resolveSharpRuntimePackageNames } from "./sharp-package-assets.mjs";
 
 const EXPECTED_PACKAGE_NAME = "@zcode/zcode-cua";
+const PREBUILT_PACKAGE_NAME = "@zcode/zcode-cua-helper-runtime";
 const RUNTIME_MANIFEST = "runtime-manifest.json";
 const MODULE_TYPE_PACKAGE_JSON = "package.json";
 const REMOVE_DIRECTORY_OPTIONS = {
@@ -134,12 +145,12 @@ function parsePeMachine(bytes, addonPath) {
   return bytes.readUInt16LE(peOffset + 4);
 }
 
-async function copyRuntimePackage(sourceRoot, targetRoot) {
+async function copyRuntimePackage(sourceRoot, targetRoot, { dereference = true } = {}) {
   const skippedDirectories = new Set(["test", "tests", "__tests__", "node_modules"]);
   const skippedSuffixes = [".map", ".md", ".markdown", ".ts"];
   await cp(sourceRoot, targetRoot, {
     recursive: true,
-    dereference: true,
+    dereference,
     filter(source) {
       if (source === sourceRoot) {
         return true;
@@ -378,9 +389,21 @@ async function verifyPackagedRuntimeDependencyClosure({
   lstatOperation,
   realpathOperation,
   readFileOperation,
+  rejectLinkedFiles = false,
 }) {
   const nodeModulesRoot = resolve(root, "node_modules");
   const visited = new Set();
+  const verifyRegularTree = async (path) => {
+    const stats = await lstatOperation(path);
+    if (stats.isSymbolicLink() || (!stats.isFile() && !stats.isDirectory())) {
+      throw new Error(
+        `[windows-cua-helper-assets] prebuilt dependency contains a linked or non-regular file: ${path}`,
+      );
+    }
+    if (stats.isDirectory()) {
+      for (const name of await readdir(path)) await verifyRegularTree(resolve(path, name));
+    }
+  };
   const verifyPackage = async (packageName) => {
     if (visited.has(packageName)) return;
     visited.add(packageName);
@@ -404,6 +427,8 @@ async function verifyPackagedRuntimeDependencyClosure({
       physicalPackageRoot,
       `runtime dependency ${packageName}`,
     );
+    // 预打包依赖不能借内部链接把包外文件带入产物；复制时也不解引用链接，并在替换前复验。
+    if (rejectLinkedFiles) await verifyRegularTree(packageRoot);
 
     const packageJsonPath = resolve(packageRoot, "package.json");
     const packageJsonBytes = await readRegularFileSnapshot(
@@ -448,6 +473,10 @@ async function verifyPackagedRuntimeDependencyClosure({
   for (const packageName of runtimePackageNames) {
     await verifyPackage(packageName);
   }
+  return [...visited].map((moduleName) => ({
+    moduleName,
+    sourceModulePath: resolvePackagedRuntimePackageRoot(nodeModulesRoot, moduleName),
+  }));
 }
 
 /**
@@ -455,6 +484,7 @@ async function verifyPackagedRuntimeDependencyClosure({
  */
 async function inspectPackagedWindowsCuaHelper({
   resourcesDir,
+  prebuiltSourceRoot,
   targetPlatform,
   electronVersion,
   verifyHashes,
@@ -479,7 +509,7 @@ async function inspectPackagedWindowsCuaHelper({
     throw new Error("[windows-cua-helper-assets] electronVersion is required");
   }
 
-  const root = resolve(resourcesDir, "tools", "cua-helper");
+  const root = prebuiltSourceRoot ?? resolve(resourcesDir, "tools", "cua-helper");
   let rootStats;
   try {
     rootStats = await lstatOperation(root);
@@ -498,7 +528,13 @@ async function inspectPackagedWindowsCuaHelper({
     realpathOperation(root),
   ]);
   // 根因：root 自身不是链接并不能排除父级 tools 是 junction；整棵 Helper 树仍可能落到 resources 外。
-  assertPhysicalContainment(physicalResourcesDir, physicalRoot, "packaged root");
+  if (prebuiltSourceRoot) {
+    if (!samePhysicalPath(root, physicalRoot)) {
+      throw new Error("[windows-cua-helper-assets] prebuilt source root physical path mismatch");
+    }
+  } else {
+    assertPhysicalContainment(physicalResourcesDir, physicalRoot, "packaged root");
+  }
 
   const manifestPath = resolve(root, RUNTIME_MANIFEST);
   const manifestBytes = await readRegularFileSnapshot(manifestPath, RUNTIME_MANIFEST, {
@@ -560,6 +596,13 @@ async function inspectPackagedWindowsCuaHelper({
   };
   for (const [field, expected] of Object.entries(expectedManifestFields)) {
     if (manifest[field] !== expected) {
+      if (prebuiltSourceRoot && field === "electronVersion") {
+        // 预打包产物的版本是来源事实，不能改成当前 Electron 冒充已验证。
+        // Node-API 可能跨版本兼容；差异需要 Windows 实测，不等于已证明 ABI 不兼容。
+        throw new Error(
+          `[windows-cua-helper-assets] native Windows validation required: helper declares Electron ${String(manifest[field])}, target is ${String(expected)}; Node-API compatibility is unverified, not disproven`,
+        );
+      }
       throw new Error(
         `[windows-cua-helper-assets] incompatible ${RUNTIME_MANIFEST} ${field}: expected ${String(expected)}`,
       );
@@ -605,6 +648,15 @@ async function inspectPackagedWindowsCuaHelper({
       `[windows-cua-helper-assets] ${MODULE_TYPE_PACKAGE_JSON} must declare {"type":"module"} and carry the same version as ${RUNTIME_MANIFEST}: ${moduleTypePackageJsonPath}`,
     );
   }
+  if (
+    prebuiltSourceRoot &&
+    (moduleTypePackageJson.name !== PREBUILT_PACKAGE_NAME ||
+      moduleTypePackageJson.main !== manifest.entry)
+  ) {
+    throw new Error(
+      `[windows-cua-helper-assets] prebuilt package must be ${PREBUILT_PACKAGE_NAME} with main matching the manifest entry`,
+    );
+  }
 
   const entryPath = resolveCanonicalPackagedArtifact(root, manifest.entry, "entry");
   const addonPath = resolveCanonicalPackagedArtifact(root, manifest.addon, "addon");
@@ -643,13 +695,14 @@ async function inspectPackagedWindowsCuaHelper({
   }
   // 根因：extraResources 会跳过 from 根目录下的 node_modules；仅校验 entry/addon 会让
   // “Helper 主树存在但 express/Sharp 闭包缺失”的安装包通过 afterPack。
-  await verifyPackagedRuntimeDependencyClosure({
+  const runtimeEntries = await verifyPackagedRuntimeDependencyClosure({
     root,
     physicalRoot,
     targetPlatform,
     lstatOperation,
     realpathOperation,
     readFileOperation,
+    rejectLinkedFiles: Boolean(prebuiltSourceRoot),
   });
 
   return {
@@ -662,6 +715,7 @@ async function inspectPackagedWindowsCuaHelper({
     manifest,
     entryBytes,
     addonBytes,
+    runtimeEntries,
   };
 }
 
@@ -682,6 +736,7 @@ function toPackagedVerificationResult(inspection) {
 export async function verifyPackagedWindowsCuaHelper(options) {
   const inspection = await inspectPackagedWindowsCuaHelper({
     ...options,
+    prebuiltSourceRoot: undefined,
     verifyHashes: true,
   });
   return toPackagedVerificationResult(inspection);
@@ -697,6 +752,7 @@ export async function finalizePackagedWindowsCuaHelper({
 }) {
   const inspection = await inspectPackagedWindowsCuaHelper({
     ...options,
+    prebuiltSourceRoot: undefined,
     verifyHashes: false,
   });
   if (inspection.status === "skipped") return inspection;
@@ -821,9 +877,10 @@ export async function prepareWindowsCuaHelperAssets({
     "source package",
     { lstatOperation, realpathOperation, readFileOperation },
   );
-  if (packageJson.name !== EXPECTED_PACKAGE_NAME) {
+  const isPrebuilt = packageJson?.name === PREBUILT_PACKAGE_NAME;
+  if (!isPrebuilt && packageJson?.name !== EXPECTED_PACKAGE_NAME) {
     throw new Error(
-      `[windows-cua-helper-assets] unexpected package name: ${String(packageJson.name)}`,
+      `[windows-cua-helper-assets] unexpected package name: ${String(packageJson?.name)}`,
     );
   }
   if (!isNonEmptyTrimmedString(packageJson.version)) {
@@ -833,7 +890,23 @@ export async function prepareWindowsCuaHelperAssets({
   }
   // 根因：消费端固定版本号和 artifact 目录会让生产者每次独立发版都必须同步改 ZCode。
   // package.json 的严格契约才是兼容边界；version 只作为安装产物的来源追踪信息。
-  const producerContract = readProducerRuntimeContract(packageJson, sourceRoot);
+  // 预打包组件目录暴露发布 manifest，需要按该契约解析，不能当作源码 producer。
+  // 复用最终产物 verifier 验证完整输入，避免为预打包资源另开较弱的校验路径。
+  const prebuiltInspection = isPrebuilt
+    ? await inspectPackagedWindowsCuaHelper({
+        resourcesDir: sourceRoot,
+        prebuiltSourceRoot: sourceRoot,
+        targetPlatform,
+        electronVersion,
+        verifyHashes: true,
+        lstatOperation,
+        realpathOperation,
+        readFileOperation,
+      })
+    : undefined;
+  const producerContract = prebuiltInspection
+    ? prebuiltInspection.manifest
+    : readProducerRuntimeContract(packageJson, sourceRoot);
 
   const entryPath = resolveCanonicalPackagedArtifact(
     sourceRoot,
@@ -845,16 +918,18 @@ export async function prepareWindowsCuaHelperAssets({
     producerContract.addon,
     "zcodeCuaRuntime.windows.nativeAddon",
   );
-  const [entryBytes, addonBytes] = await Promise.all([
-    readRegularFileSnapshot(entryPath, "entry", {
-      lstatOperation,
-      readFileOperation,
-    }),
-    readRegularFileSnapshot(addonPath, "addon", {
-      lstatOperation,
-      readFileOperation,
-    }),
-  ]);
+  const [entryBytes, addonBytes] = prebuiltInspection
+    ? [prebuiltInspection.entryBytes, prebuiltInspection.addonBytes]
+    : await Promise.all([
+        readRegularFileSnapshot(entryPath, "entry", {
+          lstatOperation,
+          readFileOperation,
+        }),
+        readRegularFileSnapshot(addonPath, "addon", {
+          lstatOperation,
+          readFileOperation,
+        }),
+      ]);
   const [physicalEntryPath, physicalAddonPath] = await Promise.all([
     realpathOperation(entryPath),
     realpathOperation(addonPath),
@@ -898,34 +973,56 @@ export async function prepareWindowsCuaHelperAssets({
       writeFile(stagedAddonPath, addonBytes),
     ]);
 
-    const moduleLookupRoots = resolveModuleLookupRoots(sourceRoot);
-    const expressEntries = collectRuntimeModuleClosureEntries(["express"], moduleLookupRoots);
-    const sharpModuleNames = resolveSharpRuntimePackageNames({
-      os: "win32",
-      arch: targetPlatform.arch,
-    });
-    const sharpModuleNameSet = new Set(sharpModuleNames);
-    // Sharp 声明了所有平台的 optionalDependencies；这里只保留当前目标集合，
-    // 避免把其他架构的原生包带进安装包和签名面。
-    const sharpEntries = collectRuntimeModuleClosureEntries(
-      sharpModuleNames,
-      moduleLookupRoots,
-    ).filter((entry) => sharpModuleNameSet.has(entry.moduleName));
-    const runtimeEntries = [
-      ...new Map(
-        [...expressEntries, ...sharpEntries].map((entry) => [entry.moduleName, entry]),
-      ).values(),
-    ];
+    // 预打包输入只复制已验证的扁平闭包；再次按父包解析可能选中未验证的嵌套依赖。
+    let runtimeEntries = prebuiltInspection?.runtimeEntries;
+    if (!runtimeEntries) {
+      const moduleLookupRoots = resolveModuleLookupRoots(sourceRoot);
+      const expressEntries = collectRuntimeModuleClosureEntries(["express"], moduleLookupRoots);
+      const sharpModuleNames = resolveSharpRuntimePackageNames({
+        os: "win32",
+        arch: targetPlatform.arch,
+      });
+      const sharpModuleNameSet = new Set(sharpModuleNames);
+      // Sharp 声明了所有平台的 optionalDependencies；这里只保留当前目标集合，
+      // 避免把其他架构的原生包带进安装包和签名面。
+      const sharpEntries = collectRuntimeModuleClosureEntries(
+        sharpModuleNames,
+        moduleLookupRoots,
+      ).filter((entry) => sharpModuleNameSet.has(entry.moduleName));
+      runtimeEntries = [
+        ...new Map(
+          [...expressEntries, ...sharpEntries].map((entry) => [entry.moduleName, entry]),
+        ).values(),
+      ];
+    }
     for (const entry of runtimeEntries) {
       if (!entry.sourceModulePath) {
         throw new Error(
           `[windows-cua-helper-assets] missing runtime dependency: ${entry.moduleName}`,
         );
       }
+      const verifyPrebuiltCopySource = async () => {
+        if (!isPrebuilt) return;
+        const physicalPath = await realpath(entry.sourceModulePath);
+        assertPhysicalContainment(
+          physicalSourceRoot,
+          physicalPath,
+          `dependency ${entry.moduleName}`,
+        );
+        if (!samePhysicalPath(entry.sourceModulePath, physicalPath)) {
+          throw new Error(
+            `[windows-cua-helper-assets] prebuilt dependency source physical path mismatch: ${entry.moduleName}`,
+          );
+        }
+      };
+      // dereference:false 不能保护路径中的父目录；复制前后检查父目录替换所造成的路径漂移。
+      await verifyPrebuiltCopySource();
       await copyRuntimePackage(
         entry.sourceModulePath,
         resolve(stagedTempRoot, "node_modules", entry.moduleName),
+        { dereference: !isPrebuilt },
       );
+      await verifyPrebuiltCopySource();
     }
 
     const [stagedEntryBytes, stagedAddonBytes] = await Promise.all([
@@ -968,6 +1065,16 @@ export async function prepareWindowsCuaHelperAssets({
       `${JSON.stringify(moduleTypePackageJson, null, 2)}\n`,
       "utf8",
     );
+    if (isPrebuilt) {
+      // 原子替换前再检查已复制的依赖与快照，不能让复制期间的输入变化破坏已有输出。
+      await inspectPackagedWindowsCuaHelper({
+        resourcesDir: stagedTempRoot,
+        prebuiltSourceRoot: stagedTempRoot,
+        targetPlatform,
+        electronVersion,
+        verifyHashes: true,
+      });
+    }
     await atomicallyReplaceDirectory(stagedTempRoot, outputDir);
     return { status: "staged", outputDir, manifest, peMachine: actualMachine };
   } catch (error) {

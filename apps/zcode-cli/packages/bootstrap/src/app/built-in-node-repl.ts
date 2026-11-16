@@ -16,7 +16,9 @@ export const BUILT_IN_NODE_REPL_SERVER_NAME = "node_repl";
 export function resolveBuiltInNodeReplMcpServers(input: {
   pluginOutcome: Pick<PluginLoadOutcome, "plugins">;
   workingDirectory: string;
+  env?: Record<string, string | undefined>;
 }): Record<string, McpServerConfig> {
+  const env = input.env ?? process.env;
   const browserUsePackage = input.pluginOutcome.plugins.find(
     (plugin) => plugin.id === OFFICIAL_BROWSER_USE_PLUGIN_ID && plugin.enabled,
   );
@@ -37,6 +39,10 @@ export function resolveBuiltInNodeReplMcpServers(input: {
       // 领域 root 各自注入，且只在对应能力启用时注入：宿主据此决定哪一半文档可用。
       ...(browserUsePackage ? { ZCODE_PLUGIN_ROOT: browserUsePackage.rootPath } : {}),
       ...(cuaPackage ? { ZCODE_CUA_PLUGIN_ROOT: cuaPackage.rootPath } : {}),
+      // 外部 Windows JS runtime 只随启用的 CUA 能力进入共享宿主，不能由浏览器插件激活。
+      ...(cuaPackage && env.ZCODE_CUA_RUNTIME_PACKAGE_DIR?.trim()
+        ? { ZCODE_CUA_RUNTIME_PACKAGE_DIR: env.ZCODE_CUA_RUNTIME_PACKAGE_DIR.trim() }
+        : {}),
     },
     rootPath: hostPackage.rootPath,
     timeoutMs: 600_000,

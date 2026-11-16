@@ -29,3 +29,8 @@ apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/vendor/** -text
 apps/zcode-cli/packages/design-plugin/skills/design/design-resources/** -text -whitespace linguist-vendored=true
 apps/zcode-cli/packages/design-plugin/hooks/design-rules text eol=lf
 apps/zcode-cli/packages/design-plugin/hooks/run-hook.cmd text eol=lf
+# runtime-manifest 同样校验运行时源码字节，Windows 检出必须保持清单对应的 LF。
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/visualize.css text eol=lf
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/visualize.html text eol=lf
+apps/zcode-cli/packages/visualize-plugin/skills/visualize/assets/calendar.js text eol=lf
+packages/desktop/src/renderer/src/plugin-sandbox/genUiTweakRuntime.js text eol=lf

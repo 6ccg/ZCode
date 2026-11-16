@@ -1,3 +1,7 @@
+import {
+  externalWindowsCuaEnvironment,
+  externalWindowsCuaFunction,
+} from "./src/external-windows-runtime.js";
 import { CuaHelperError } from "./broker.js";
 import { HELPER_APP_NAME } from "./broker-helper-constants.js";
 
@@ -15,6 +19,11 @@ export function buildHelperOpenArgs(_spec, _launcherPid) {
 }
 
 export async function resolveHelperPermissionSubjectIdentity(_appPath) {
+  const external = externalWindowsCuaFunction(
+    "./broker/server",
+    "resolveHelperPermissionSubjectIdentity",
+  );
+  if (external) return external(...arguments);
   throw new CuaHelperError(UNAVAILABLE);
 }
 
@@ -23,6 +32,8 @@ export function isCuaLocalDevelopmentRuntime(_env, _compiledLocalDevelopmentRunt
 }
 
 export function createCuaHelperInstaller(_options) {
+  const external = externalWindowsCuaFunction("./broker/server", "createCuaHelperInstaller");
+  if (external) return external(...arguments);
   return {
     ensureInstalled: unavailableReject,
     verifyInstalled: unavailableReject,
@@ -36,10 +47,14 @@ export const defaultCuaHelperVerifierDependencies = {
 };
 
 export function cuaBrokerRefreshMarkerPath(_socketPath) {
+  const external = externalWindowsCuaFunction("./broker/server", "cuaBrokerRefreshMarkerPath");
+  if (external) return external(...arguments);
   return undefined;
 }
 
 export async function publishCuaBrokerRefreshMarker(_socketPath, _options) {
+  const external = externalWindowsCuaFunction("./broker/server", "publishCuaBrokerRefreshMarker");
+  if (external) return external(...arguments);
   return { path: undefined };
 }
 
@@ -70,6 +85,8 @@ export class CuaHelperLifecycleManager {
   #current;
   #disposed = false;
   constructor(dispose) {
+    const External = externalWindowsCuaFunction("./broker/server", "CuaHelperLifecycleManager");
+    if (External) return new External(dispose);
     this.#dispose = dispose;
     this.#current = undefined;
   }
@@ -94,10 +111,19 @@ export class CuaHelperLifecycleManager {
 }
 
 export class CuaProductHelperWorkspaceRegistry {
+  constructor() {
+    const External = externalWindowsCuaFunction(
+      "./broker/server",
+      "CuaProductHelperWorkspaceRegistry",
+    );
+    if (External) return new External();
+  }
   setEnabled(_context, _enabled) {}
 }
 
 export function createProductCuaHelperHost(_options) {
+  const external = externalWindowsCuaFunction("./broker/server", "createProductCuaHelperHost");
+  if (external) return external(...arguments);
   return createUnavailableCuaHelperHost();
 }
 
@@ -131,10 +157,20 @@ function createUnavailableCuaHelperHost() {
 }
 
 export function isOfficialCuaPluginEnabledForWorkspace(_options) {
+  const external = externalWindowsCuaFunction(
+    "./broker/server",
+    "isOfficialCuaPluginEnabledForWorkspace",
+  );
+  if (external) return external(...arguments);
   return false;
 }
 
 export function createCuaProductMcpServerResolver(_host, _options) {
+  const external = externalWindowsCuaFunction(
+    "./broker/server",
+    "createCuaProductMcpServerResolver",
+  );
+  if (external) return external(...arguments);
   return {
     async resolveMcpServers(servers, _context) {
       return servers;
@@ -149,24 +185,70 @@ export function createCuaProductMcpServerResolver(_host, _options) {
 }
 
 export async function waitForCuaHelperStartup(startup, _deadlineMs) {
+  const external = externalWindowsCuaFunction("./broker/server", "waitForCuaHelperStartup");
+  if (external) return external(...arguments);
   return await startup;
 }
 
-export function isPotentialZCodeCuaAgentMcpServer(_server) {
-  return false;
+export function isPotentialZCodeCuaAgentMcpServer(server) {
+  // 这是移除未代理 CUA 条目的纯识别边界，不是权限判定；不能依赖外部 runtime 成功加载。
+  if (!server || typeof server !== "object" || typeof server.command !== "string") return false;
+  const name = typeof server.name === "string" ? server.name.trim().toLowerCase() : "";
+  const env = Array.isArray(server.env) ? server.env : [];
+  const value = (key) =>
+    env.find((item) => item?.name === key && typeof item.value === "string")?.value;
+  const isPackage = (text) => {
+    if (typeof text !== "string") return false;
+    const leaf = text
+      .replace(/[\\/]+$/u, "")
+      .split(/[\\/]/u)
+      .at(-1);
+    return [text, leaf].some((part) =>
+      /^zcode-cua(?:$|\[|@|==|\.)/u.test(part?.replace(/_/gu, "-")),
+    );
+  };
+  if (name === "computer-use") return true;
+  if (name.startsWith("plugin:")) {
+    if (
+      name === "plugin:computer-use:computer-use" &&
+      value("ZCODE_PLUGIN_ID")?.trim().toLowerCase() === "computer-use@zcode-plugins-official"
+    )
+      return true;
+    if (isPackage(value("ZCODE_CUA_PACKAGE_SPEC"))) return true;
+  }
+  return isPackage(server.command) || (Array.isArray(server.args) && server.args.some(isPackage));
 }
 
 export function isScreenCaptureProbeSuccess(_probe) {
+  const external = externalWindowsCuaFunction("./broker/server", "isScreenCaptureProbeSuccess");
+  if (external) return external(...arguments);
   return false;
 }
 
-export function markCuaProductHelperAgentEnvUnavailable(_host) {}
+export function markCuaProductHelperAgentEnvUnavailable(_host) {
+  const external = externalWindowsCuaFunction(
+    "./broker/server",
+    "markCuaProductHelperAgentEnvUnavailable",
+  );
+  if (external) return external(...arguments);
+}
 
 export function hasCuaProductHelperAgentEnvUnavailable(_host) {
+  const external = externalWindowsCuaFunction(
+    "./broker/server",
+    "hasCuaProductHelperAgentEnvUnavailable",
+  );
+  if (external) return external(...arguments);
   return false;
 }
 
-export function clearCuaProductHelperAgentEnvUnavailable(_host) {}
+export function clearCuaProductHelperAgentEnvUnavailable(_host) {
+  const external = externalWindowsCuaFunction(
+    "./broker/server",
+    "clearCuaProductHelperAgentEnvUnavailable",
+  );
+  if (external) return external(...arguments);
+}
 
 export async function reapOrphanedHelpers(_options) {}
 
@@ -194,4 +276,8 @@ export function standaloneHelperCandidatePaths(_env) {
 // 开源构建不注入 Computer Use broker MCP 服务，原样返回。
 export function injectPermissionBrokerAgentMcpServers(servers, _options) {
   return servers;
+}
+
+export function resolveWindowsCuaRuntimeEnvironment(options) {
+  return externalWindowsCuaEnvironment(options);
 }

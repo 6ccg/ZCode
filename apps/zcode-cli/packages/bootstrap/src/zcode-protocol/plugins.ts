@@ -1,5 +1,6 @@
 import {
   zcodePluginsConfigureParamsSchema,
+  ZCODE_CUA_OFFICIAL_PLUGIN_ID,
   zcodePluginsResetConfigParamsSchema,
   zcodePluginsInstallParamsSchema,
   zcodePluginsMarketplaceAddParamsSchema,
@@ -436,10 +437,16 @@ export async function updatePlugin(
   rawParams: unknown,
 ): Promise<ZCodePluginsInstallResult> {
   const params = parseParams(zcodePluginsUpdateParamsSchema, rawParams);
+  if (params.pluginId === ZCODE_CUA_OFFICIAL_PLUGIN_ID) {
+    throw new Error(
+      "Computer Use is a bundled software component; update the application to upgrade it.",
+    );
+  }
   const pluginStorageRoot = resolvePluginStorageRoot(params.workspace.workspacePath);
   // 在同一把写锁内选择待更新记录，避免把等锁期间卸载的插件重新装回去。
   return withPluginStorageLock(pluginStorageRoot, async (lock) => {
     const installed = listInstalledPluginRecords(pluginStorageRoot).filter((record) => {
+      if (record.id === ZCODE_CUA_OFFICIAL_PLUGIN_ID) return false;
       if (params.pluginId) return record.id === params.pluginId;
       if (params.marketplace) return record.marketplace === params.marketplace;
       return true;

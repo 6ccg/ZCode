@@ -1,0 +1,9 @@
+// Computer Use component bridge. MIT license: see LICENSE.
+export {
+  CUA_APP_ASSOCIATIONS_META_KEY,
+  CUA_APP_ASSOCIATIONS_MAX_META_BYTES,
+  CUA_APP_ASSOCIATIONS_MAX_ITEMS,
+  CUA_APP_ASSOCIATIONS_MAX_ITEM_ICON_BYTES,
+  CUA_APP_ASSOCIATIONS_MAX_ICON_BYTES,
+  readAppAssociations,
+} from "./vendor/dist-index.js";

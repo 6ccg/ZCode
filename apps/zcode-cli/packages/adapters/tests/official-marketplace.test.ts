@@ -120,6 +120,29 @@ describe("ZCode official marketplace partitions", () => {
     return storageRoot;
   }
 
+  it("keeps Computer Use at the software's bundled version when CDN advertises another", async () => {
+    const storageRoot = await makeStorageRoot();
+    await writeBundledOfficialMarketplacePartition({
+      storageRoot,
+      manifest: {
+        name: "zcode-plugins-official",
+        plugins: [{ name: "computer-use", source: "filesystem", version: "0.6.5" }],
+      },
+    });
+    const merged = await writeCdnOfficialMarketplacePartition({
+      storageRoot,
+      manifest: {
+        name: "zcode-plugins-official",
+        plugins: [
+          { name: "computer-use", source: { source: "url", type: "zip" }, version: "0.6.6" },
+        ],
+      },
+    });
+    expect(merged.plugins).toEqual([
+      { name: "computer-use", source: "filesystem", version: "0.6.5" },
+    ]);
+  });
+
   it("merges bundled and CDN entries under one marketplace with CDN entries taking precedence", async () => {
     const storageRoot = await makeStorageRoot();
 

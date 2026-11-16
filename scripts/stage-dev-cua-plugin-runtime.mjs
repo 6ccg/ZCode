@@ -1,6 +1,9 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { isRealComputerUseProducerInstalled } from "../packages/desktop/scripts/computer-use-producer.mjs";
+import {
+  isRealComputerUseProducerInstalled,
+  isWindowsComputerUseHelperEnabled,
+} from "../packages/desktop/scripts/computer-use-producer.mjs";
 import { stageSharpIntoBundledAgents } from "../packages/desktop/scripts/sharp-package-assets.mjs";
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
@@ -14,7 +17,11 @@ export function stageDevCuaPluginRuntime({
 } = {}) {
   if (env.ZCODE_CUA_DEV_MODE !== "1") return [];
   // 开源占位包不提供 Computer Use 原生能力，也不随附 Sharp：没有真实 producer 时不暂存。
-  if (!isRealComputerUseProducerInstalled({ desktopPackageRoot })) return [];
+  if (
+    !isRealComputerUseProducerInstalled({ desktopPackageRoot }) &&
+    !isWindowsComputerUseHelperEnabled({ desktopPackageRoot, platform, env })
+  )
+    return [];
 
   const manifestPath = resolve(pluginRoot, ".zcode-plugin", "plugin.json");
   if (!existsSync(manifestPath)) {
@@ -29,6 +36,7 @@ export function stageDevCuaPluginRuntime({
   // shared node_repl host，不再作为 CUA native 依赖的解析根目录。
   return stageSharpIntoBundledAgents({
     desktopPackageRoot,
+    env,
     glmDir: pluginRoot,
     targetPlatform: {
       os: platform,

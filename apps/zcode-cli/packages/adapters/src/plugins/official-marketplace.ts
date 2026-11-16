@@ -3,6 +3,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { writePluginTextIfChanged } from "./helpers.js";
 import { withFileLock } from "@zcode/shared/node";
 import { ZCODE_OFFICIAL_PLUGIN_MARKETPLACE } from "@zcode/contracts";
+import { ZCODE_CUA_OFFICIAL_PLUGIN_ID } from "@zcode/shared";
 
 const BUNDLED_PARTITION_FILE = "bundled-marketplace.json";
 const CDN_PARTITION_FILE = "cdn-marketplace.json";
@@ -76,7 +77,11 @@ async function rebuildOfficialMarketplace(storageRoot: string): Promise<Record<s
   const bundledPartition = await readBundledPartition(storageRoot);
   const cdnManifest = await readJsonRecord(partitionPath(storageRoot, CDN_PARTITION_FILE));
   const bundledManifest = bundledPartition?.manifest;
-  const cdnPlugins = readPluginEntries(cdnManifest);
+  // CUA SDK 与私有 helper 是同一软件组件；CDN 不能独立替换随包版本，避免契约漂移。
+  const fixedCuaName = ZCODE_CUA_OFFICIAL_PLUGIN_ID.split("@")[0];
+  const cdnPlugins = readPluginEntries(cdnManifest).filter(
+    (plugin) => readPluginName(plugin) !== fixedCuaName,
+  );
   const cdnPluginNames = new Set(cdnPlugins.map(readPluginName).filter(isDefined));
   const bundledPlugins = readPluginEntries(bundledManifest).filter((plugin) => {
     const name = readPluginName(plugin);

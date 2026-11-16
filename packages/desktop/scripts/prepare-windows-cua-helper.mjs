@@ -9,11 +9,13 @@ import {
   resolveWindowsCuaHelperSourceRoot,
 } from "./windows-cua-helper-assets.mjs";
 import { getTargetPlatform } from "./target-platform.mjs";
+import { configureBundledComputerUse } from "./computer-use-producer.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const desktopPackageRoot = resolve(scriptDir, "..");
 const servicesPackageRoot = resolve(desktopPackageRoot, "..", "services");
 const targetPlatform = getTargetPlatform();
+configureBundledComputerUse({ desktopPackageRoot, target: targetPlatform });
 
 if (targetPlatform.os !== "win32") {
   console.log("[prepare-windows-cua-helper] skip unsupported platform");

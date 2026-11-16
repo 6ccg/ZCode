@@ -22,9 +22,24 @@
 // before afterPack because extraResources already ships the whole glm/
 // directory; afterPack then verifies the final app tree.
 
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
+import {
+  isWindowsComputerUseHelperEnabled,
+  isBundledMacComputerUseEnabled,
+  readComputerUseProducer,
+} from "./computer-use-producer.mjs";
 
 const requireFromDesktop = createRequire(import.meta.url);
 
@@ -151,33 +166,68 @@ function copyRuntimePackage(sourceRoot, targetRoot) {
 }
 
 /**
- * Stage Sharp's JS dependencies and target-specific native packages into
- * `<glmDir>/node_modules/...` so the shared node_repl server.js can
- * resolve the bare specifier `import sharp from "sharp"` from either official
- * plugin root. CUA passes its own root explicitly and does not depend on
- * Browser Use's staged files.
- *
- * Must be idempotent and safe to run for every desktop target platform.
+ * Sharp 服务于 Computer Use 截图；保留真实 producer 的依赖声明判定。
+ * Windows source bridge 不声明 Sharp，但外部 runtime 从 CUA plugin 根目录加载它，
+ * 因此暂存与校验还需复用 Windows Helper 的显式输入 gate，不能只看依赖清单。
+ * 其他占位目标继续跳过；目标平台必须由构建调用方提供，不能误用构建宿主平台。
  */
-/**
- * sharp 只服务于 Computer Use 截图（由 @zcode/zcode-cua 声明依赖）。
- * 构建使用不声明 sharp 的 Computer Use 占位包时，不暂存也不校验 sharp，安装包不携带 sharp/libvips。
- * 这里只读当前安装的 @zcode/zcode-cua 清单，不依赖包导出（其 exports 不含 package.json）。
- */
-export function isSharpRequiredByComputerUse({ desktopPackageRoot }) {
-  for (let dir = resolve(desktopPackageRoot); ; dir = dirname(dir)) {
-    const manifestPath = resolve(dir, "node_modules", "@zcode", "zcode-cua", "package.json");
-    if (existsSync(manifestPath)) {
-      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-      return ["dependencies", "optionalDependencies", "peerDependencies"].some(
-        (field) => typeof manifest[field]?.sharp === "string",
-      );
-    }
-    if (dirname(dir) === dir) return false;
-  }
+export function isSharpRequiredByComputerUse({
+  desktopPackageRoot,
+  targetPlatform,
+  env = process.env,
+}) {
+  const producer = readComputerUseProducer({ desktopPackageRoot });
+  if (!producer.installed) return false;
+  if (
+    ["dependencies", "optionalDependencies", "peerDependencies"].some(
+      (field) => typeof producer.manifest[field]?.sharp === "string",
+    )
+  )
+    return true;
+  return (
+    producer.placeholder &&
+    (isWindowsComputerUseHelperEnabled({
+      desktopPackageRoot,
+      platform: targetPlatform?.os,
+      env,
+    }) ||
+      isBundledMacComputerUseEnabled({ desktopPackageRoot, platform: targetPlatform?.os, env }))
+  );
 }
 
-export function stageSharpIntoBundledAgents({ desktopPackageRoot, glmDir, targetPlatform }) {
+function resolveHelperSharpPackageRoot(packageName, helperRoot) {
+  const packageRoot = resolve(helperRoot, "node_modules", packageName);
+  const manifestPath = resolve(packageRoot, "package.json");
+  if (
+    !existsSync(packageRoot) ||
+    !lstatSync(packageRoot).isDirectory() ||
+    realpathSync(packageRoot) !== packageRoot ||
+    !existsSync(manifestPath) ||
+    !lstatSync(manifestPath).isFile() ||
+    realpathSync(manifestPath) !== manifestPath
+  ) {
+    throw new Error(
+      `[sharp-package-assets] helper requires a contained physical package: ${packageName} at ${packageRoot}`,
+    );
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (manifest.name !== packageName) {
+    throw new Error(`[sharp-package-assets] helper package identity mismatch: ${packageName}`);
+  }
+  return packageRoot;
+}
+
+/**
+ * Stage Sharp into the supplied plugin root. Legacy producers use desktop
+ * dependencies; enabled Windows source bridges use one explicit helper tree.
+ * This does not replace the helper pipeline's native and manifest validation.
+ */
+export function stageSharpIntoBundledAgents({
+  desktopPackageRoot,
+  glmDir,
+  targetPlatform,
+  env = process.env,
+}) {
   if (!desktopPackageRoot) {
     throw new Error("[sharp-package-assets] desktopPackageRoot is required");
   }
@@ -191,13 +241,34 @@ export function stageSharpIntoBundledAgents({ desktopPackageRoot, glmDir, target
   }
 
   const runtimePackageNames = resolveSharpRuntimePackageNames(targetPlatform);
+  let helperRoot;
+  if (
+    readComputerUseProducer({ desktopPackageRoot }).placeholder &&
+    (isWindowsComputerUseHelperEnabled({ desktopPackageRoot, platform: targetPlatform.os, env }) ||
+      isBundledMacComputerUseEnabled({ desktopPackageRoot, platform: targetPlatform.os, env }))
+  ) {
+    // 修复原因：开源包不安装 Sharp；已有外部 Helper 提供完整依赖，必须同源选取，
+    // 不能逐包回退到桌面/祖先 node_modules 而混入另一版本或架构。Helper 的完整
+    // manifest/hash/PE/Electron 校验仍由原准备链负责，这里不执行其 JS 或 native。
+    const explicitRoot =
+      env.ZCODE_CUA_HELPER_RUNTIME_PACKAGE_DIR?.trim() || env.ZCODE_CUA_DEV_ROOT?.trim();
+    if (!isAbsolute(explicitRoot)) {
+      throw new Error("[sharp-package-assets] explicit Windows helper root must be absolute");
+    }
+    helperRoot = realpathSync(explicitRoot);
+  }
+  const runtimePackages = runtimePackageNames.map((name) => ({
+    name,
+    sourceRoot: helperRoot
+      ? resolveHelperSharpPackageRoot(name, helperRoot)
+      : resolvePackageRoot(name, desktopPackageRoot),
+  }));
 
   const stagedNodeModulesDir = resolve(glmDir, "node_modules");
   mkdirSync(stagedNodeModulesDir, { recursive: true });
 
   const staged = [];
-  for (const packageName of runtimePackageNames) {
-    const sourceRoot = resolvePackageRoot(packageName, desktopPackageRoot);
+  for (const { name: packageName, sourceRoot } of runtimePackages) {
     const targetRoot = resolve(stagedNodeModulesDir, packageName);
     copyRuntimePackage(sourceRoot, targetRoot);
     staged.push({ name: packageName, sourceRoot, targetRoot });

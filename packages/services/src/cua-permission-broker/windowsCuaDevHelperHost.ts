@@ -81,7 +81,10 @@ export class WindowsCuaHelperHost implements ManagedCuaProductHelperHost {
   constructor(private readonly options: WindowsCuaHelperHostOptions) {
     this.childProcess = options.childProcess ?? defaultChildProcess;
     this.mintSocketPath = options.mintSocketPath ?? defaultSocketPathFactory;
-    this.healthProbe = options.healthProbe ?? defaultHealthProbe;
+    // 原版 Windows helper 的 peer gate 暂时关闭；health 与已准入 MCP 使用同一 Host authority。
+    this.healthProbe =
+      options.healthProbe ??
+      ((socket, timeout) => defaultHealthProbe(socket, timeout, this.authority));
     this.startupTimeoutMs = options.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
     this.shutdownTimeoutMs = options.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
     this.logger = options.logger ?? createServiceLogger("windows-cua-helper-host");
@@ -325,6 +328,7 @@ export class WindowsCuaHelperHost implements ManagedCuaProductHelperHost {
           ...process.env,
           ...this.options.runtime.commandEnv,
           [ADDON_ENV]: this.options.runtime.addonPath,
+          ZCODE_CUA_PLUGIN_AUTHORITY: this.authority,
           ELECTRON_RUN_AS_NODE: "1",
         },
       });
