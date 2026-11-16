@@ -11,3 +11,6 @@ export const ZCODE_MARKETING_TOUCH_ENABLED: boolean = false;
 
 /** 保留上游渠道实现；当前发行仅在前端关闭智谱/Z.ai 官方套餐入口。 */
 export const ZHIPU_OFFICIAL_PLANS_ENABLED: boolean = false;
+
+/** Windows 绿色版不注册 zcode:// 协议与资源管理器右键菜单；接收链接与参数的能力保留。 */
+export const ZCODE_WINDOWS_SHELL_INTEGRATION_ENABLED: boolean = false;

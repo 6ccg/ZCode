@@ -3561,6 +3561,31 @@ const koKR: Record<string, string> = {
     "일부 GPU 또는 드라이버로 인해 빈 창, 충돌, 렌더링 문제가 발생하면 이 옵션을 끄세요. 앱을 다시 시작해야 적용됩니다.",
   "settings.desktopChromiumHardwareAccelerationSavedHint":
     "Chrome 하드웨어 가속 설정이 저장되었습니다. 앱을 다시 시작해야 적용됩니다.",
+  "settings.portableUpdate.availableNotice":
+    "새 버전 {version}을 사용할 수 있습니다. 설정에서 업데이트하세요.",
+  "settings.portableUpdate.readyNotice":
+    "{version} 다운로드가 완료되었습니다. 작업을 저장한 후 재시작하세요.",
+  "settings.portableUpdate.openSettings": "업데이트 설정 열기",
+  "settings.portableUpdate.source": "업데이트 주소",
+  "settings.portableUpdate.sourceHelp":
+    "GitHub Release 또는 JSON 매니페스트 URL을 입력하세요. 비워 두면 요청하지 않습니다. 변경 후 저장하세요.",
+  "settings.portableUpdate.automatic": "자동으로 업데이트 확인",
+  "settings.portableUpdate.autoDownload": "새 버전 자동 다운로드",
+  "settings.portableUpdate.autoDownloadHelp":
+    "설치는 직접 재시작해야 합니다. 실행 중인 작업은 자동으로 중단하지 않습니다.",
+  "settings.portableUpdate.save": "저장",
+  "settings.portableUpdate.check": "지금 확인",
+  "settings.portableUpdate.download": "업데이트 다운로드",
+  "settings.portableUpdate.cancel": "취소",
+  "settings.portableUpdate.install": "재시작하고 설치",
+  "settings.portableUpdate.development": "개발 환경에서는 설치할 수 없습니다",
+  "settings.portableUpdate.state.idle": "대기 중인 업데이트 없음",
+  "settings.portableUpdate.state.checking": "업데이트 확인 중",
+  "settings.portableUpdate.state.available": "업데이트 사용 가능",
+  "settings.portableUpdate.state.downloading": "다운로드 중",
+  "settings.portableUpdate.state.ready": "설치 준비 완료",
+  "settings.portableUpdate.state.installing": "업데이트를 위해 재시작 중",
+  "settings.portableUpdate.state.error": "업데이트 실패. 다시 시도할 수 있습니다",
   "settings.receivePreviewUpdates": "미리 보기 업데이트 먼저 받기",
   "settings.receivePreviewUpdatesDescription":
     "켜면 새로운 기능과 개선 사항을 가장 먼저 사용할 수 있습니다. 끄면 정기 릴리스 일정에 따라 업데이트를 받습니다.",

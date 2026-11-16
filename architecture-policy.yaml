@@ -1843,6 +1843,18 @@ modules:
       adapters: .
     owner: desktop
 
+  # User-configured portable updates; official updater remains disabled.
+  - id: desktop-portable-updates
+    roots: [packages/desktop/src/main/portable-updates]
+    managed: true
+    requires: [shared, services]
+    publicEntrypoints:
+      - packages/desktop/src/main/portable-updates/index.ts
+      - packages/desktop/src/main/portable-updates/contract.ts
+    layers: { adapters: . }
+    layerOrder: [adapters]
+    owner: desktop-settings
+
 global:
   # 临时时间戳（2026-09-10）：unmanaged-new-file 只约束此日期之后首次入库的文件。
   # 基于领先 staging 很多的分支开工时，merge-base 之前的"新增"文件不应被追溯。
@@ -1898,6 +1910,12 @@ exceptions:
       - packages/ui/src/v4/composer/PromptEnhancementFeedback.tsx
       - packages/ui/src/v4/composer/promptEnhancementContext.ts
     reason: fork 内置提示词覆盖层与提示词增强（specs/builtin-prompt-editor.md、specs/prompt-enhancement.md）；SettingService 唯一写入，CLI 只读快照，UI 通过 hook 访问。
+  - id: fork-portable-dist
+    rule: unmanaged-new-file
+    paths:
+      - packages/shared/src/fork/portable-update.ts
+      - packages/desktop/src/main/desktopWindowsOpenFolderContextMenu.ts
+    reason: fork 绿色版分发（specs/fork-portable-dist.md）；更新类型归 shared/fork，Windows 右键菜单仅在入口按开关短路。
 
   - id: region-copy-suggested-prompts-edit
     rule: unmanaged-new-file

@@ -602,6 +602,13 @@ const appSettingsObjectSchema = z.object({
   pendingPostUpdateReleaseNotes: postUpdateReleaseNotesPayloadSchema.optional(),
   receivePreviewUpdates: z.boolean().default(false),
   autoDownloadAndInstallUpdates: z.boolean().default(false),
+  portableUpdates: z
+    .object({
+      source: z.string().default(""),
+      automatic: z.boolean().default(false),
+      autoDownload: z.boolean().default(false),
+    })
+    .optional(),
   skippedElectronUpdateVersions: skippedElectronUpdateVersionsSchema,
   settingsSyncFirstRunPromptHandled: z.boolean().optional(),
   webRemoteControlRelayV2Device: webRemoteControlRelayV2DeviceSchema.optional(),
@@ -714,6 +721,9 @@ export const appSettingsPatchSchema = z.object({
   pendingPostUpdateReleaseNotes: postUpdateReleaseNotesPayloadSchema.optional(),
   receivePreviewUpdates: z.boolean().optional(),
   autoDownloadAndInstallUpdates: z.boolean().optional(),
+  portableUpdates: z
+    .object({ source: z.string(), automatic: z.boolean(), autoDownload: z.boolean() })
+    .optional(),
   skippedElectronUpdateVersions: z
     .partialRecord(electronReleaseChannelSchema, nonEmptyStringSchema)
     .optional(),

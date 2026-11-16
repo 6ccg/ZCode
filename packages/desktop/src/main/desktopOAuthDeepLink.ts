@@ -8,6 +8,7 @@ import {
   type OAuthProviderId,
   type OAuthStateRegistration,
   PlatformChannels,
+  ZCODE_WINDOWS_SHELL_INTEGRATION_ENABLED,
 } from "@zcode/shared";
 import {
   extractWorkspaceOpenPath,
@@ -402,6 +403,10 @@ export function registerDeepLinkProtocol(
   },
   options: { iconPath?: string } = {},
 ) {
+  // 修改版（fork）：Windows 绿色版不写系统协议登记，已有登记由用户自行管理。
+  if (process.platform === "win32" && !ZCODE_WINDOWS_SHELL_INTEGRATION_ENABLED) {
+    return;
+  }
   const scheme = "zcode";
 
   // 外部 URL 必须位于 -- 后；否则 Windows 引号拆分可把 URL 内容变成 Electron 启动参数。

@@ -19,7 +19,12 @@ import {
   TID_SETTINGS_TOOL_SEARCH_OPTION,
 } from "@zcode/shared/test-ids";
 import { ZCODE_APP_UPDATES_ENABLED } from "@zcode/shared";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import type {
+  PortableUpdateCommand,
+  PortableUpdateState,
+  PortableUpdatePreferences,
+} from "@zcode/shared";
 import type { IPlatformService } from "@zcode/shared";
 import {
   TID_SETTINGS_LOCALE_SELECT_ITEM,
@@ -162,6 +167,7 @@ export function GeneralSectionContent({
   isWindowsDesktop,
   isLinuxDesktop,
   linuxCloseToTray,
+  platform,
   showIntegratedTerminalShell = false,
   setLocalePreference,
   setNotificationEnabled,
@@ -627,6 +633,9 @@ export function GeneralSectionContent({
                 />
               }
             />
+            {!isLinuxDesktop && platform?.managePortableUpdate ? (
+              <PortableUpdateSettings platform={platform} />
+            ) : null}
             {ZCODE_APP_UPDATES_ENABLED ? (
               <>
                 <SettingsRow
@@ -791,6 +800,151 @@ export function GeneralSectionContent({
         />
       </SettingsGroupCard>
     </div>
+  );
+}
+
+function PortableUpdateSettings({ platform }: { platform: IPlatformService }) {
+  const { intl } = useZCodeIntl();
+  const manage = platform.managePortableUpdate;
+  const subscribe = platform.onPortableUpdateStateChanged;
+  const [snapshot, setSnapshot] = useState<PortableUpdateState | null>(null);
+  const [draft, setDraft] = useState<PortableUpdatePreferences>({
+    source: "",
+    automatic: false,
+    autoDownload: false,
+  });
+  const [error, setError] = useState("");
+  const dirty = useRef(false);
+  const revision = useRef(-1);
+  const message = (key: string) => intl.formatMessage({ id: `settings.portableUpdate.${key}` });
+  const accept = useCallback((state: PortableUpdateState) => {
+    // 先订阅再读取快照；迟到的初始快照不能覆盖已收到的新事件。
+    if (state.revision < revision.current) return;
+    revision.current = state.revision;
+    setSnapshot(state);
+    if (!dirty.current) setDraft(state.preferences);
+  }, []);
+  useEffect(() => {
+    if (!manage) return;
+    let active = true;
+    const receive = (state: PortableUpdateState) => {
+      if (active) accept(state);
+    };
+    const dispose = subscribe?.(receive);
+    void manage({ action: "status" })
+      .then(receive)
+      .catch((reason) => {
+        if (active) setError(reason instanceof Error ? reason.message : String(reason));
+      });
+    return () => {
+      active = false;
+      dispose?.();
+    };
+  }, [manage, subscribe, accept]);
+  const run = async (command: PortableUpdateCommand) => {
+    if (!manage) return;
+    setError("");
+    try {
+      const state = await manage(command);
+      if (command.action === "configure") dirty.current = false;
+      accept(state);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  };
+  const change = (patch: Partial<PortableUpdatePreferences>) => {
+    dirty.current = true;
+    setDraft((previous) => ({ ...previous, ...patch }));
+  };
+  const busy =
+    snapshot?.phase === "checking" ||
+    snapshot?.phase === "downloading" ||
+    snapshot?.phase === "installing";
+  return (
+    <>
+      <SettingsRow
+        label={message("source")}
+        description={message("sourceHelp")}
+        control={
+          <div className="flex w-full max-w-md items-center gap-2">
+            <Input
+              data-testid="portable-update-source"
+              aria-label={message("source")}
+              value={draft.source}
+              onChange={(event) => change({ source: event.target.value })}
+              placeholder="https://api.github.com/repos/6ccg/ZCode/releases/latest"
+              disabled={snapshot?.phase === "installing"}
+            />
+            <Button
+              data-testid="portable-update-save"
+              variant="outline"
+              onClick={() => void run({ action: "configure", preferences: draft })}
+              disabled={snapshot?.phase === "installing"}
+            >
+              {message("save")}
+            </Button>
+          </div>
+        }
+      />
+      <SettingsRow
+        label={message("automatic")}
+        control={
+          <Switch
+            data-testid="portable-update-automatic"
+            aria-label={message("automatic")}
+            checked={draft.automatic}
+            onCheckedChange={(automatic) => change({ automatic })}
+          />
+        }
+      />
+      <SettingsRow
+        label={message("autoDownload")}
+        description={message("autoDownloadHelp")}
+        control={
+          <Switch
+            aria-label={message("autoDownload")}
+            checked={draft.autoDownload}
+            onCheckedChange={(autoDownload) => change({ autoDownload })}
+          />
+        }
+      />
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-ui-sm">
+        <span className="text-muted-foreground" role="status" data-testid="portable-update-status">
+          {snapshot ? message(`state.${snapshot.phase}`) : message("state.idle")}
+          {snapshot?.version ? ` · ${snapshot.version}` : ""}
+          {snapshot?.phase === "downloading" ? ` · ${snapshot.progress ?? 0}%` : ""}
+        </span>
+        <Button
+          variant="outline"
+          data-testid="portable-update-check"
+          disabled={!snapshot?.preferences.source || busy}
+          onClick={() => void run({ action: "check" })}
+        >
+          {message("check")}
+        </Button>
+        {snapshot?.phase === "available" ? (
+          <Button onClick={() => void run({ action: "download" })}>{message("download")}</Button>
+        ) : null}
+        {busy && snapshot?.phase !== "installing" ? (
+          <Button variant="outline" onClick={() => void run({ action: "cancel" })}>
+            {message("cancel")}
+          </Button>
+        ) : null}
+        {snapshot?.phase === "ready" ? (
+          <Button disabled={!snapshot.supported} onClick={() => void run({ action: "install" })}>
+            {message("install")}
+          </Button>
+        ) : null}
+        {snapshot && !snapshot.supported ? (
+          <span className="text-muted-foreground">{message("development")}</span>
+        ) : null}
+        {error || snapshot?.error ? (
+          <span className="w-full text-destructive" role="alert">
+            {error || snapshot?.error}
+          </span>
+        ) : null}
+      </div>
+    </>
   );
 }
 

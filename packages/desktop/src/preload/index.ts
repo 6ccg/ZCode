@@ -932,6 +932,18 @@ contextBridge.exposeInMainWorld("zcode", {
   },
   getUpdateState: (): Promise<UpdateStatePayload> =>
     ipcRenderer.invoke(PlatformChannels.GetUpdateState),
+  managePortableUpdate: (
+    command: import("@zcode/shared").PortableUpdateCommand,
+  ): Promise<import("@zcode/shared").PortableUpdateState> =>
+    ipcRenderer.invoke(PlatformChannels.PortableUpdate, command),
+  onPortableUpdateStateChanged: (
+    callback: (state: import("@zcode/shared").PortableUpdateState) => void,
+  ) => {
+    const handler = (_event: unknown, state: import("@zcode/shared").PortableUpdateState) =>
+      callback(state);
+    ipcRenderer.on(PlatformChannels.PortableUpdateStateChanged, handler);
+    return () => ipcRenderer.removeListener(PlatformChannels.PortableUpdateStateChanged, handler);
+  },
   /** 开始下载当前已发现的更新 */
   downloadUpdate: () => ipcRenderer.invoke(PlatformChannels.DownloadUpdate),
   /** 取消当前正在下载的更新 */

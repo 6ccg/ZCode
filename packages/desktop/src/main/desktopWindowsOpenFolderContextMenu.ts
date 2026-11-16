@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
-import { toZhOrEnLocale, type Locale } from "@zcode/shared";
+import { toZhOrEnLocale, ZCODE_WINDOWS_SHELL_INTEGRATION_ENABLED, type Locale } from "@zcode/shared";
 
 const MENU_KEY_NAME = "ZCode.OpenInZCode";
 const DIRECTORY_MENU_KEY = `HKCU\\Software\\Classes\\Directory\\shell\\${MENU_KEY_NAME}`;
@@ -84,6 +84,10 @@ export async function installWindowsOpenFolderContextMenu(options: {
   locale: Locale;
   logger: Logger;
 }): Promise<void> {
+  // 修改版（fork）：Windows 绿色版不写注册表右键菜单，已有登记由用户自行管理。
+  if (!ZCODE_WINDOWS_SHELL_INTEGRATION_ENABLED) {
+    return;
+  }
   if (options.platform !== "win32") {
     return;
   }

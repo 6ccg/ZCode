@@ -356,6 +356,12 @@ declare global {
       onUpdateStateChanged?(callback: (payload: UpdateStatePayload) => void): () => void;
       /** 主动读取当前自动更新状态 */
       getUpdateState?(): Promise<UpdateStatePayload>;
+      managePortableUpdate?(
+        command: import("@zcode/shared").PortableUpdateCommand,
+      ): Promise<import("@zcode/shared").PortableUpdateState>;
+      onPortableUpdateStateChanged?(
+        callback: (state: import("@zcode/shared").PortableUpdateState) => void,
+      ): () => void;
       /** 开始下载当前已发现的更新 */
       downloadUpdate?(): Promise<void>;
       /** 取消当前正在下载的更新 */
