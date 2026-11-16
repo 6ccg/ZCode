@@ -1855,6 +1855,16 @@ exceptions:
       - packages/services/src/marketing-touch/marketingTouchService.ts
       - packages/ui/src/components/marketing-touch/MarketingTouchProvider.tsx
     reason: fork 隐私开关（specs/fork-privacy.md）；开关集中在 shared/fork，调用点只在既有边界提前返回，不新增外部调用或业务状态。
+  - id: fork-modellink-catalog
+    rule: unmanaged-new-file
+    paths:
+      - packages/provider/src/model-catalog.ts
+      - packages/provider-node/src/modellink-catalog-loader.ts
+      - apps/zcode-cli/packages/bootstrap/src/app/model-catalog-port.ts
+      - apps/zcode-cli/packages/contracts/src/interfaces/model-catalog.port.ts
+      - packages/ui/src/settings/model-provider-section/AuxiliaryModelSelector.tsx
+    reason: fork ModelLink 与辅助模型（specs/modellink-providers.md）；ProviderConfigService 仍为唯一配置所有者，仅精确准入这些路径。
+
   - id: region-copy-suggested-prompts-edit
     rule: unmanaged-new-file
     paths: [packages/ui/src/v4/featureSuggestedPrompts.ts]

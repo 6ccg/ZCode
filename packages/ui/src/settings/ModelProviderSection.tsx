@@ -45,6 +45,7 @@ import {
 import { ModelProviderSectionDetail } from "./model-provider-section/Detail.js";
 import { ModelProviderSectionLayout } from "./model-provider-section/SectionLayout.js";
 import { ProviderTemplatePicker } from "./model-provider-section/ProviderTemplatePicker.js";
+import { AuxiliaryModelSelector } from "./model-provider-section/AuxiliaryModelSelector.js";
 import type { CodingPlanLoginOptions } from "./model-provider-section/codingPlanPricingCards.js";
 import { useModelProviderNavigation } from "./model-provider-section/useModelProviderNavigation.js";
 import { reportPresetSubscriptionSuccess } from "./model-provider-section/oauthActions.js";
@@ -267,6 +268,9 @@ export function ModelProviderSection({
     refresh,
     saveProvider,
     createPersonalProvider,
+    refreshModelCatalog,
+    detachCatalogModel,
+    saveAuxiliaryModelSelection,
     addPersonalModel,
     savePersonalModelDraft,
     setPersonalModelEnabled,
@@ -319,6 +323,8 @@ export function ModelProviderSection({
   const [pendingCreatedProviderId, setPendingCreatedProviderId] = useState<string | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [creatingProvider, setCreatingProvider] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   useEffect(() => {
     if (
@@ -1021,7 +1027,7 @@ export function ModelProviderSection({
   );
 
   const handleCreateProvider = useCallback(
-    async (input: { templateId?: string; providerName?: string }) => {
+    async (input: NonNullable<Parameters<typeof createPersonalProvider>[0]>) => {
       setCreatingProvider(true);
       try {
         // Provider 模板名只有中英两套，非中文界面语言用英文名。
@@ -1157,6 +1163,14 @@ export function ModelProviderSection({
       }}
       addProviderLabel={intl.formatMessage({ id: "settings.modelProvider.addProviderAction" })}
       onAddProvider={() => setTemplatePickerOpen(true)}
+      auxiliaryControl={
+        providerSettingsView ? (
+          <AuxiliaryModelSelector
+            view={providerSettingsView}
+            onSave={saveAuxiliaryModelSelection}
+          />
+        ) : undefined
+      }
       navigationGroups={navigationGroups}
       selectedNodeKey={selectedNodeKey}
       onSelectNavItem={handleSelectNavItem}
@@ -1172,6 +1186,40 @@ export function ModelProviderSection({
           })}
         </p>
       ) : null}
+      {!templatePickerOpen &&
+      selectedNavItem?.type === "custom" &&
+      selectedNavItem.provider.catalog ? (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            disabled={catalogLoading || !selectedNavItem.provider.config.api?.baseUrl?.trim()}
+            data-testid="modellink-fetch-models"
+            onClick={async () => {
+              setCatalogLoading(true);
+              setCatalogError(null);
+              try {
+                await refreshModelCatalog(selectedNavItem.provider.providerId);
+              } catch (error) {
+                setCatalogError(error instanceof Error ? error.message : String(error));
+              } finally {
+                setCatalogLoading(false);
+              }
+            }}
+          >
+            {intl.formatMessage({
+              id: catalogLoading ? "common.loading" : "settings.modelProvider.fetchCatalog",
+            })}
+          </Button>
+          <span className="text-ui-sm text-foreground-subtle">
+            {intl.formatMessage({
+              id: selectedNavItem.provider.catalog.fetchedAt
+                ? "settings.modelProvider.catalogLoaded"
+                : "settings.modelProvider.catalogSetup",
+            })}
+          </span>
+          {catalogError ? <p role="alert">{catalogError}</p> : null}
+        </div>
+      ) : null}
       {templatePickerOpen ? (
         <ProviderTemplatePicker
           templates={providerTemplates}
@@ -1183,6 +1231,17 @@ export function ModelProviderSection({
           onCreateCustom={(label) => {
             return handleCreateProvider({ providerName: label });
           }}
+          onCreateModelLink={(protocol) =>
+            handleCreateProvider({
+              providerName: protocol === "chat" ? "ModelLink Chat" : "ModelLink Responses",
+              catalogSource: "modellink",
+              initialConfig: {
+                api: {
+                  type: protocol === "chat" ? "openai-chat-completions" : "openai-responses",
+                },
+              },
+            })
+          }
         />
       ) : (
         <ModelProviderSectionDetail
@@ -1217,6 +1276,7 @@ export function ModelProviderSection({
           onSavePersonalModelDraft={savePersonalModelDraft}
           onSetPersonalModelEnabled={setPersonalModelEnabled}
           onDeletePersonalModel={deletePersonalModel}
+          onDetachCatalogModel={detachCatalogModel}
           onDelete={handleDelete}
           // Provider 的左栏排序权限被误复用成模型排序门禁，导致 Built-in / Account
           // Provider 的 Effective 模型无法写入 Personal modelOrder。模型调序独立于成员来源。

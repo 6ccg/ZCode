@@ -23,6 +23,7 @@ import { getOffPeakExecution } from "../off-peak/runtime.js";
 export interface TitleModelContext {
   selection: ModelSelection | undefined;
   requestDependencies?: ModelRequestDependencies;
+  auxiliaryReasoningLevel?: string;
   release(): void;
 }
 
@@ -30,7 +31,9 @@ export function retainTitleModelContext(
   runtime: AgentRuntimeInternal,
   offPeakExecutionId?: string,
 ): TitleModelContext {
-  const explicitSelection = runtime.config.titleGeneration?.modelSelection;
+  const explicitSelection =
+    runtime.config.titleGeneration?.modelSelection ??
+    runtime.modelCatalogPort?.getAuxiliaryModelSelection?.();
   const execution = getOffPeakExecution(runtime);
   const idle = execution && !execution.lifecycle.terminal && !execution.lifecycle.ownedByUser;
   // 标题先异步读库，主轮可能在此期间结束；必须在入队时冻结选择并独立保留票据。
@@ -45,7 +48,12 @@ export function retainTitleModelContext(
   // 独立标题遵循自己的配置；未归属闲时执行的调用不能借用临时 Session 闲时模型。
   const selection =
     explicitSelection ?? (idle ? execution.ordinarySelection : runtime.getSessionModelSelection());
-  return { selection: selection && cloneModelSelection(selection), release() {} };
+  // 辅助模型及档位与标题任务一起冻结，避免上游异步标题队列借用后续会话配置。
+  return {
+    selection: selection && cloneModelSelection(selection),
+    auxiliaryReasoningLevel: explicitSelection?.options?.reasoningLevel,
+    release() {},
+  };
 }
 
 export const SESSION_TITLE_QUERY_SOURCE = "session_title";
@@ -131,7 +139,9 @@ async function generateTitleCandidateImpl(
     selection: requestedModelSelection,
     requestDependencies: context.requestDependencies,
   });
-  const model = baseModel.bind(auxiliaryModelOptions(baseModel));
+  const model = baseModel.bind(
+    auxiliaryModelOptions(baseModel, context.auxiliaryReasoningLevel),
+  );
   const modelSelection = cloneModelSelection(requestedModelSelection);
   const modelTraceContext = createChildTraceContext(options.traceContext, {
     attributes: {

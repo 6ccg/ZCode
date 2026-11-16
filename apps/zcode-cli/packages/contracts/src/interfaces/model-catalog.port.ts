@@ -1,7 +1,7 @@
 // ============================================================
 // Model Catalog Port - 宿主已配置模型的只读快照边界
 // ============================================================
-// 存在的理由只有一个：
+// 同时提供宿主保存的辅助文本选择，Core 不直接读取用户配置文件。
 // 工具层要把用户说的模型名（"GLM-5.3-Flash"）解析成一次 workflow run 的子代理选型，而 core
 // 看不见 provider 注册表。端口把「有哪些模型」这件宿主事实递进来，解析本身留在 core
 // （纯函数，无 I/O）。
@@ -10,6 +10,8 @@
 // 为了列一张表去等网络；宿主侧本来就只是读一份内存里的注册表视图。
 
 /** 目录里的一个模型条目（一条 provider × model 的组合）。 */
+import type { ModelSelection } from "../model/model.js";
+
 export interface ModelCatalogEntry {
   providerId: string;
   modelId: string;
@@ -27,6 +29,8 @@ export interface ModelCatalogEntry {
 }
 
 export interface ModelCatalogPort {
+  /** 每次读取当前配置；已失效的显式选择原样返回，由模型工厂拒绝，不能静默换模型。 */
+  getAuxiliaryModelSelection?(): ModelSelection | undefined;
   /**
    * 列出此刻可选的模型。
    *
