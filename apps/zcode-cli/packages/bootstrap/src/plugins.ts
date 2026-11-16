@@ -47,6 +47,7 @@ import {
 } from "@zcode/adapters/plugins";
 import type {
   Logger,
+  OfficialMcpTrustedOriginRegistry,
   PluginHookDetail,
   PluginLoadOutcome,
   PluginMetadata,
@@ -117,6 +118,43 @@ function pluginMutation<O extends ResolveZCodePluginsOptions, T>(
 }
 
 export interface ListZCodePluginsOptions extends ResolveZCodePluginsOptions {}
+
+export function guardOfficialPluginNetworkOrigins(
+  origins: OfficialMcpTrustedOriginRegistry,
+  options: ResolveZCodePluginsOptions,
+): OfficialMcpTrustedOriginRegistry {
+  return {
+    async isTrusted(request) {
+      // 官方 HTTP MCP 可以匿名回退，须在发请求前拒绝，而非仅扣留身份头。
+      if (!(await isOfficialNetworkPluginEnabled(request.pluginId, options))) {
+        return { trusted: false, detail: "official_plugin_disabled" };
+      }
+      return origins.isTrusted(request);
+    },
+  };
+}
+
+/** 每次出站读取既有插件配置；旧会话不能绕过用户刚关闭的官方联网插件。 */
+export async function isOfficialNetworkPluginEnabled(
+  pluginId: string | undefined,
+  options: ResolveZCodePluginsOptions = {},
+): Promise<boolean> {
+  const name = pluginId?.split("@")[0];
+  if (name !== "zcode-site" && name !== "image-search") return true;
+  const id = `${name}@${ZCODE_OFFICIAL_PLUGIN_MARKETPLACE}`;
+  if (pluginId !== name && pluginId !== id) return true;
+  try {
+    // 修复原因：上游配置解析已异步化；必须等待本次读取，不能沿用旧会话的启用快照。
+    const { configResult } = await resolvePluginContext({ ...options, configResult: undefined });
+    return (
+      !configResult.config.plugins.suppressedBuiltins.includes(id) &&
+      configResult.config.plugins.enabledPlugins[id] === true
+    );
+  } catch {
+    // 配置损坏或不可读时不能退回默认联网，也不能借匿名请求发出正文。
+    return false;
+  }
+}
 
 export interface SetZCodePluginEnabledOptions extends ResolveZCodePluginsOptions {
   enabled: boolean;

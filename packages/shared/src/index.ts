@@ -98,6 +98,8 @@ export {
   normalizeZCodeEnv,
   normalizeZCodeProductFlavor,
 } from "./env.js";
+// 修改版（fork）补丁的唯一共享出口。
+export * from "./fork/index.js";
 export * from "./errors.js";
 export {
   USER_INSTRUCTIONS_MAX_BYTES,

@@ -26,6 +26,7 @@ import type { McpPort, ModelSelection } from "@zcode/contracts";
 import type { PresentationSurface } from "@zcode/core";
 import type { RunZCodeProtocolAgentOptions, ZCodeAppOptions } from "./app/types.js";
 import { createZCodeApp } from "./app/create-app.js";
+import { guardOfficialPluginNetworkOrigins, isOfficialNetworkPluginEnabled } from "./plugins.js";
 import {
   createNodeReplBrowserBroker,
   type NodeReplBrowserBroker,
@@ -258,6 +259,10 @@ export async function runZCodeProtocolAgent(
     const resolveZCodeApiOrigin = (): string =>
       resolveRuntimeZCodeEndpointOrigin(options.env ?? process.env);
     const workspaceIdentity = (options.env ?? process.env)[ZCODE_WORKSPACE_IDENTITY_ENV]?.trim();
+    const officialTrustedOrigins = createOfficialMcpTrustedOriginRegistry({
+      devTrustedOriginsRaw: (options.env ?? process.env)[OFFICIAL_MCP_DEV_TRUSTED_ORIGINS_ENV],
+      resolveZCodeApiOrigin,
+    });
     const officialMcpAuth = {
       authHeadersPort: createOfficialMcpAuthHeadersPort({
         resolveContext: () => officialMcpAuthContext,
@@ -281,21 +286,32 @@ export async function runZCodeProtocolAgent(
       }),
       resolveZCodeApiOrigin,
       ...(workspaceIdentity ? { workspaceIdentity } : {}),
-      // 信任判定只看一条：目标 origin 等于当前 ZCode API origin（https）。pluginId 不参与。
+      // 保留原有 origin 校验，并在它之前检查修改版官方联网插件的当前开关。
       // origin 运行时解析（跟随 production/test 与自建环境），不硬编码域名。
-      trustedOrigins: createOfficialMcpTrustedOriginRegistry({
-        devTrustedOriginsRaw: (options.env ?? process.env)[OFFICIAL_MCP_DEV_TRUSTED_ORIGINS_ENV],
-        resolveZCodeApiOrigin,
+      trustedOrigins: guardOfficialPluginNetworkOrigins(officialTrustedOrigins, {
+        env: options.env,
+        workingDirectory: options.cwd,
       }),
     };
     // 官方插件命令进程的代理端点（技术方案 5.8）：CLI 不持有凭证，端点每个请求向 host 现取
     // 身份头后转发给 zcode-server。和官方 MCP 用同一个 origin 表达式与网络配置。
     const endpointEnv = options.env ?? process.env;
     officialCommandEndpoint = createOfficialCommandEndpoint({
-      resolveHeaders: createOfficialCommandAuthHeadersPort({
-        resolveContext: () => officialMcpAuthContext,
-        logger,
-      }).resolveHeaders,
+      resolveHeaders: async (request) => {
+        // Sites 的 Bash 代理不依赖插件工具列表；旧 token 的每次调用也须检查开关。
+        if (
+          !(await isOfficialNetworkPluginEnabled(request.pluginId, {
+            env: options.env,
+            workingDirectory: request.workspace.workspacePath,
+          }))
+        ) {
+          return { ok: false, reason: "official_auth_unavailable" };
+        }
+        return createOfficialCommandAuthHeadersPort({
+          resolveContext: () => officialMcpAuthContext,
+          logger,
+        }).resolveHeaders(request);
+      },
       resolveZCodeApiOrigin,
       appVersion: endpointEnv.ZCODE_APP_VERSION?.trim() || options.version,
       fetch: createMcpTransportFetch({ env: endpointEnv, network: configResult.config.network }),

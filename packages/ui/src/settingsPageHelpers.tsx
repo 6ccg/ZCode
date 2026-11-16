@@ -18,6 +18,7 @@ import {
   TID_SETTINGS_TOOL_SEARCH_SELECT,
   TID_SETTINGS_TOOL_SEARCH_OPTION,
 } from "@zcode/shared/test-ids";
+import { ZCODE_APP_UPDATES_ENABLED } from "@zcode/shared";
 import { useState, useCallback, useEffect } from "react";
 import type { IPlatformService } from "@zcode/shared";
 import {
@@ -626,42 +627,46 @@ export function GeneralSectionContent({
                 />
               }
             />
-            <SettingsRow
-              searchId="settings.receivePreviewUpdates"
-              label={intl.formatMessage({ id: "settings.receivePreviewUpdates" })}
-              description={intl.formatMessage({
-                id: "settings.receivePreviewUpdatesDescription",
-              })}
-              control={
-                <Switch
-                  aria-label={intl.formatMessage({ id: "settings.receivePreviewUpdates" })}
-                  checked={receivePreviewUpdates}
-                  onCheckedChange={(checked) => {
-                    void onReceivePreviewUpdatesChange(checked);
-                  }}
+            {ZCODE_APP_UPDATES_ENABLED ? (
+              <>
+                <SettingsRow
+                  searchId="settings.receivePreviewUpdates"
+                  label={intl.formatMessage({ id: "settings.receivePreviewUpdates" })}
+                  description={intl.formatMessage({
+                    id: "settings.receivePreviewUpdatesDescription",
+                  })}
+                  control={
+                    <Switch
+                      aria-label={intl.formatMessage({ id: "settings.receivePreviewUpdates" })}
+                      checked={receivePreviewUpdates}
+                      onCheckedChange={(checked) => {
+                        void onReceivePreviewUpdatesChange(checked);
+                      }}
+                    />
+                  }
                 />
-              }
-            />
-            <SettingsRow
-              searchId="settings.autoDownloadAndInstallUpdates"
-              label={intl.formatMessage({
-                id: "settings.autoDownloadAndInstallUpdates",
-              })}
-              description={intl.formatMessage({
-                id: "settings.autoDownloadAndInstallUpdatesDescription",
-              })}
-              control={
-                <Switch
-                  aria-label={intl.formatMessage({
+                <SettingsRow
+                  searchId="settings.autoDownloadAndInstallUpdates"
+                  label={intl.formatMessage({
                     id: "settings.autoDownloadAndInstallUpdates",
                   })}
-                  checked={autoDownloadAndInstallUpdates}
-                  onCheckedChange={(checked) => {
-                    void onAutoDownloadAndInstallUpdatesChange(checked);
-                  }}
+                  description={intl.formatMessage({
+                    id: "settings.autoDownloadAndInstallUpdatesDescription",
+                  })}
+                  control={
+                    <Switch
+                      aria-label={intl.formatMessage({
+                        id: "settings.autoDownloadAndInstallUpdates",
+                      })}
+                      checked={autoDownloadAndInstallUpdates}
+                      onCheckedChange={(checked) => {
+                        void onAutoDownloadAndInstallUpdatesChange(checked);
+                      }}
+                    />
+                  }
                 />
-              }
-            />
+              </>
+            ) : null}
           </>
         ) : null}
         <SettingsRow
